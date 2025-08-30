@@ -12,3 +12,4 @@ angle = base_angle
 print(angle)
 pulse = int((angle + 30)*4)
 print(pulse)
+
