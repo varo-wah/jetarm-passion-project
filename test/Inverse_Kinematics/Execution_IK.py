@@ -24,6 +24,9 @@ def angle_cosine(a, b, c, *, degrees=True):
 def angle_to_pulse(angle_deg, deg_per_pulse=DEG_PER_PULSE, zero_offset=ZERO_OFFSET):
     return int(round((angle_deg - zero_offset) / deg_per_pulse))
 
+def arm_to_pulse(arm_deg, deg_per_pulse=DEG_PER_PULSE, zero_offset=ZERO_OFFSET):
+    return int(round((arm_deg - zero_offset) / deg_per_pulse))
+
 x, y, z = map(float, input("Enter x y z: ").split())
 
 base_angle = math.degrees(math.atan2(y, x))
@@ -55,3 +58,4 @@ print(base_pulse, L1_pulse, L2_pulse)
 Arm1.moveJetArm(1, base_pulse)
 Arm1.moveJetArm(2, L1_pulse)
 Arm1.moveJetArm(3, L2_pulse)
+Arm1.moveJetArm(4, 500)
