@@ -5,7 +5,8 @@ Arm1 = CKMJetArm()
 L1 = 10.0
 L2 = 15.0
 DEG_PER_PULSE = 0.25 
-ZERO_OFFSET = -35.0 
+BASE_ZERO_OFFSET = 125.0
+ANGLE_ZERO_OFFSET = 125.0
 ELBOW_UP = True 
 
 def angle_cosine(a, b, c, *, degrees=True):
@@ -21,7 +22,7 @@ def angle_cosine(a, b, c, *, degrees=True):
     ang = math.acos(x)
     return math.degrees(ang) if degrees else ang
 
-def angle_to_pulse(angle_deg, deg_per_pulse=DEG_PER_PULSE, zero_offset=ZERO_OFFSET):
+def base_to_pulse(angle_deg, deg_per_pulse=DEG_PER_PULSE, zero_offset=BASE_ZERO_OFFSET):
     return int(round((angle_deg - zero_offset) / deg_per_pulse))
 
 def arm_to_pulse(arm_deg, deg_per_pulse=DEG_PER_PULSE, zero_offset=ZERO_OFFSET):
@@ -50,9 +51,9 @@ print(f"Elbow (L2) angle: {L2_angle:.3f}°")
 print(f"Shoulder (L1) angle: {L1_angle:.3f}°")
 print(f"Base angle: {base_angle:.3f}°")
 
-base_pulse = angle_to_pulse(base_angle)
-L1_pulse   = angle_to_pulse(L1_angle)
-L2_pulse   = angle_to_pulse(L2_angle)
+base_pulse = base_to_pulse(base_angle)
+L1_pulse   = arm_to_pulse(L1_angle)
+L2_pulse   = arm_to_pulse(L2_angle)
 print(base_pulse, L1_pulse, L2_pulse)
 
 Arm1.moveJetArm(1, base_pulse)

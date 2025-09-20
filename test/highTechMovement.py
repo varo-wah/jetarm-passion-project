@@ -9,12 +9,11 @@ pub = node.create_publisher(ServosPosition, '/ros_robot_controller/bus_servo/set
 
 time.sleep(0.5)
 
-def moveJetArmTo(servo_id, target_position): 
+def moveJetArm(servo_id, target_position): 
     pub.publish(ServosPosition(duration=1.0, position=[ServoPosition(id=servo_id, position=target_position)]))
     print(f"✅ Command sent to servo {servo_id} → position {target_position}")
     time.sleep(0.1)
-def moveJetArm(servo_id, add_angle):
-    moveJetArm(10, 300)
+
 def reset():
     for i in range(2, 5):
         moveJetArm(i, 500)
