@@ -1,6 +1,5 @@
 import math
 
-
 L1 = 15.0
 L2 = 15.0
 DEG_PER_PULSE = 0.25 
