@@ -43,12 +43,17 @@ if ELBOW_UP:
 else:
     L2_angle = 360 - (Intersection + 90)
 
+#L3 angle
+L3_angle = 90 - (L2_angle + L1_angle)
+
 
 print(f"Elbow (L2) angle: {L2_angle:.3f}°")
 print(f"Shoulder (L1) angle: {L1_angle:.3f}°")
+print(f"Shoulder (L3) angle: {L3_angle:.3f}°")
 print(f"Base angle: {base_angle:.3f}°")
 
 base_pulse = base_to_pulse(base_angle)
 L2_pulse = arm_to_pulse(L2_angle)
 L1_pulse = arm_to_pulse(L1_angle)
+L3_pulse = arm_to_pulse(L3_angle)
 print(base_pulse, L1_pulse, L2_pulse)
