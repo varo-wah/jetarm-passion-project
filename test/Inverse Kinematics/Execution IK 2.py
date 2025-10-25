@@ -45,7 +45,7 @@ if ELBOW_UP:
 else:
     L2_angle = 360 - (Intersection + 90)
 
-#L3 angle
+#L3 angleno i
 L3_angle = 90 - (L2_angle + L1_angle)
 
 
@@ -60,7 +60,7 @@ L1_pulse = arm_to_pulse(L1_angle)
 L3_pulse = arm_to_pulse(L3_angle) + 60
 print(base_pulse, L1_pulse, L2_pulse, L3_pulse)
 
-Permission = bool(input("Execute selected angles: "))
+Permission = bool(input("Execute selected angles (True/False: ")) == "True"
 
 if Permission:
     Arm1.moveJetArm(1, base_pulse)
