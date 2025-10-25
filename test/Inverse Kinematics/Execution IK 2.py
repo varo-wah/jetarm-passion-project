@@ -1,3 +1,5 @@
+from classCreation import CKMJetArm
+Arm1 = CKMJetArm()
 import math
 
 L1 = 15.0
@@ -57,3 +59,9 @@ L2_pulse = arm_to_pulse(L2_angle)
 L1_pulse = arm_to_pulse(L1_angle)
 L3_pulse = arm_to_pulse(L3_angle) + 60
 print(base_pulse, L1_pulse, L2_pulse, L3_pulse)
+
+Arm1.moveJetArm(1, base_pulse)
+Arm1.moveJetArm(2, L1_pulse)
+Arm1.moveJetArm(3, L2_pulse)
+Arm1.moveJetArm(4, 500)
+Arm1.moveJetArm(4, 500)
