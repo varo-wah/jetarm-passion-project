@@ -66,5 +66,4 @@ if Permission:
     Arm1.moveJetArm(1, base_pulse)
     Arm1.moveJetArm(2, L1_pulse)
     Arm1.moveJetArm(3, L2_pulse)
-    Arm1.moveJetArm(4, 500)
-    Arm1.moveJetArm(4, 500)
+    Arm1.moveJetArm(4, L3_pulse)
