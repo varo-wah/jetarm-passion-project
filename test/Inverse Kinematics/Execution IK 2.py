@@ -57,10 +57,10 @@ print(f"Base angle: {base_angle:.3f}°")
 base_pulse = base_to_pulse(base_angle)
 L2_pulse = arm_to_pulse(L2_angle)
 L1_pulse = arm_to_pulse(L1_angle)
-L3_pulse = arm_to_pulse(L3_angle) + 60
+L3_pulse = arm_to_pulse(L3_angle) + 40
 print(base_pulse, L1_pulse, L2_pulse, L3_pulse)
 
-Permission = (input("Execute selected angles (True/False: "))
+Permission = (input("Execute selected angles (True/False): "))
 
 if Permission == "True":
     Arm1.moveJetArm(1, base_pulse)
