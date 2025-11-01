@@ -1,6 +1,9 @@
 from classCreation import CKMJetArm
 Arm1 = CKMJetArm()
 import math
+import rclpy
+from rclpy.node import Node
+from ros_robot_controller_msgs.msg import ServosPosition, ServoPosition
 
 class JetArmIK:
     def __init__(self):
@@ -54,3 +57,59 @@ class JetArmIK:
         self.Arm.moveJetArm(2, L1_pulse)
         self.Arm.moveJetArm(3, L2_pulse)
         self.Arm.moveJetArm(4, L3_pulse)
+
+class JetArmGripper:
+    def __init__(self):
+        self.Arm = CKMJetArm()
+        self.openGripperPulse = 0
+        self.closeGripperPulse = 1000
+    def close_gripper(self):
+        self.Arm.moveJetArm(1, self.closeGripperPulse)
+    def open_gripper(self):
+        self.Arm.moveJetArm(1, self.openGripperPulse)
+
+class JetArmMovement:
+    def __init__(self):
+    def moveJetArm(self,servo_id, target_position):
+        pub.publish(ServosPosition(duration=1.0, position=[ServoPosition(id=servo_id, position=target_position)]))
+        print(f"✅ Command sent to servo {servo_id} → position {target_position}")
+        self.time.sleep(0.1)
+    def reset(self):
+        for i in range(2, 5):
+        self.Arm.moveJetArm(i, 500)
+        self.Arm.moveJetArm(10, 500)
+        self.Arm.moveJetArm(1, 500)
+        self.time.sleep(3.0)
+    def front(self):
+        self.Arm.moveJetArm(10, 10)
+        self.Arm.moveJetArm(2, 330)
+        self.Arm.moveJetArm(3, 250)
+        self.Arm.moveJetArm(4, 400)
+        self.time.sleep(1.0)
+        self.Arm.moveJetArm(10, 700)
+    def frontopen(self):
+        self.Arm.moveJetArm(2, 330)
+        self.Arm.moveJetArm(3, 250)
+        self.Arm.moveJetArm(4, 400)
+        self.time.sleep(1.0)
+        self.Arm.moveJetArm(10, 10)
+
+    def up(self):
+        for i in range(2, 5):
+            self.Arm.moveJetArm(i, 500)
+        self.Arm.moveJetArm(1, 500)
+
+class ComputerVision:
+    def __init__(self):
+        self.Arm = CKMJetArm()
+
+while True:
+    try:
+        code = input(">>> ")
+        if code.lower() in ['exit', 'quit']:
+            break
+        exec(code)
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+
