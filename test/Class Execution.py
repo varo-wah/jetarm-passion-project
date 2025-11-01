@@ -7,7 +7,7 @@ from ros_robot_controller_msgs.msg import ServosPosition, ServoPosition
 
 class JetArmIK:
     def __init__(self):
-        self.Arm = CKMJetArm()
+        self.Arm = Arm
         self.L1 = 15.0
         self.L2 = 15.0
         self.DEG_PER_PULSE = 0.24
@@ -50,7 +50,7 @@ class JetArmIK:
         base_pulse = self.base_to_pulse(base_angle)
         L1_pulse = self.arm_to_pulse(L1_angle)
         L2_pulse = self.arm_to_pulse(L2_angle)
-        L3_pulse = self.arm_to_pulse(L3_angle) + 60
+        L3_pulse = self.arm_to_pulse(L3_angle) + 40
 
         print(f"Moving to: {base_pulse}, {L1_pulse}, {L2_pulse}, {L3_pulse}")
         self.Arm.moveJetArm(1, base_pulse)
@@ -60,17 +60,20 @@ class JetArmIK:
 
 class JetArmGripper:
     def __init__(self):
-        self.Arm = CKMJetArm()
+        self.Arm = Arm
         self.openGripperPulse = 0
         self.closeGripperPulse = 1000
     def close_gripper(self):
-        self.Arm.moveJetArm(1, self.closeGripperPulse)
+        self.Arm.moveJetArm(10, self.closeGripperPulse)
     def open_gripper(self):
-        self.Arm.moveJetArm(1, self.openGripperPulse)
+        self.Arm.moveJetArm(10, self.openGripperPulse)
 
 class ComputerVision:
     def __init__(self):
-        self.Arm = CKMJetArm()
+        self.Arm = Arm
+
+ik = JetArmIK()
+gripper = JetArmGripper()
 
 while True:
     try:
