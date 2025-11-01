@@ -45,7 +45,7 @@ if ELBOW_UP:
 else:
     L2_angle = 360 - (Intersection + 90)
 
-#L3 angleno i
+#L3 angle no
 L3_angle = 90 - (L2_angle + L1_angle)
 
 
