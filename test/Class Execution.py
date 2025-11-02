@@ -56,7 +56,7 @@ class JetArmIK:
         self.Arm.moveJetArm(1, base_pulse)
         self.Arm.moveJetArm(2, L1_pulse)
         self.Arm.moveJetArm(3, L2_pulse)
-        self.Arm.moveJetArm(4, L3_pulse))
+        self.Arm.moveJetArm(4, L3_pulse)
 class JetArmGripper:
     def __init__(self):
         self.Arm = Arm
