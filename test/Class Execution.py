@@ -50,7 +50,7 @@ class JetArmIK:
         base_pulse = self.base_to_pulse(base_angle)
         L1_pulse = self.arm_to_pulse(L1_angle)
         L2_pulse = self.arm_to_pulse(L2_angle)
-        L3_pulse = self.arm_to_pulse(L3_angle) + 40
+        L3_pulse = self.arm_to_pulse(L3_angle) + 35
 
         print(f"Moving to: {base_pulse}, {L1_pulse}, {L2_pulse}, {L3_pulse}")
         self.Arm.moveJetArm(1, base_pulse)
