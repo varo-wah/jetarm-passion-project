@@ -4,10 +4,10 @@ import numpy as np
 
 # Real-world coordinates in mm for your 30 cm × 22 cm workspace
 world_pts = np.array([
-    [-150,   130],     # bottom-left
-    [150, 130],     # bottom-right
-    [150, 350],   # top-right
-    [-150],   350]    # top-left
+    [-150, 80],    # bottom-left
+    [150, 80],     # bottom-right
+    [150, 300],    # top-right
+    [-150, 300]    # top-left
 ], dtype=np.float32)
 
 clicked = []

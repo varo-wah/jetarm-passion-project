@@ -44,8 +44,9 @@ while True:
         X, Y = pixel_to_world(cx, cy)
 
         # --- Apply camera offset (mm) ---
-        X += 10   # camera is 1 cm left of hand → shift right
-        Y += 50   # camera is 5 cm lower than hand → shift up
+        X += -18   # shift left 1.8 cm
+        Y += 16    # shift up 1.6 cm
+
         # ---------------------------------
 
         # Draw visualization

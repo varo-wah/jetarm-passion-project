@@ -68,11 +68,15 @@ class JetArmGripper:
         self.Arm.moveJetArm(10, self.openGripperPulse)
 
 class ComputerVision:
-    def __init__(self):
+    def __init__(self, ik):
         self.Arm = Arm
+        self.ik = ik
+    def scan_position(self): 
+        self.ik.move_to(0, 15, 23)
 
 ik = JetArmIK()
 gripper = JetArmGripper()
+camera = ComputerVision(ik)
 
 while True:
     try:
