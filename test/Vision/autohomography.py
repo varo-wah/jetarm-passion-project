@@ -3,10 +3,10 @@ import numpy as np
 
 # Real-world coordinates in mm
 world_pts = np.array([
-    [-150, 80],    # bottom-left
-    [150, 80],     # bottom-right
-    [150, 300],    # top-right
-    [-150, 300]    # top-left
+    [-147.5,  80.0],   # bottom-left
+    [ 147.5,  80.0],   # bottom-right
+    [ 147.5, 302.0],   # top-right  (80 + 222)
+    [-147.5, 302.0]    # top-left
 ], dtype=np.float32)
 
 # Open camera and grab one frame

@@ -45,7 +45,7 @@ while True:
 
         # --- Apply camera offset (mm) ---
         X += -18   # shift left 1.8 cm
-        Y += 16    # shift up 1.6 cm
+        Y += 25    # shift up 2.5 cm
 
         # ---------------------------------
 
