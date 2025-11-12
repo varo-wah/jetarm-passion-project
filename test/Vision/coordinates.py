@@ -10,7 +10,6 @@ def pixel_to_world(u, v):
     X, Y = real[0][0]
     return float(X), float(Y)
 
-# Camera
 cap = cv2.VideoCapture(0)
 
 while True:
@@ -19,9 +18,9 @@ while True:
         break
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5,5), 0)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # Adaptive threshold: highlight objects that differ in brightness
+    # Contrast-based segmentation
     thresh = cv2.adaptiveThreshold(
         blur, 255,
         cv2.ADAPTIVE_THRESH_MEAN_C,
@@ -29,40 +28,63 @@ while True:
         25, 5
     )
 
-    # Find contours
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(
+        thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
 
     for c in contours:
         area = cv2.contourArea(c)
-        if area < 400 or area > 20000:  # skip tiny noise and large shadows
+        if area < 400 or area > 20000:
             continue
 
-        x, y, w, h = cv2.boundingRect(c)
-        cx, cy = int(x + w/2), int(y + h/2)
+        # --- key part: minAreaRect for tilt ---
+        rect = cv2.minAreaRect(c)
+        # rect = ((cx, cy), (w, h), angle)
+        (cx, cy), (w, h), angle = rect
 
-        # Convert pixel → world
-        X, Y = pixel_to_world(cx, cy)
+        # convert box points to int and draw rotated rectangle
+        box = cv2.boxPoints(rect)
+        box = np.int32(box)
+        cv2.drawContours(frame, [box], 0, (0, 255, 0), 2)
 
-        # --- Apply camera offset (mm) ---
-        X += -18   # shift left 1.8 cm
-        Y += 25    # shift up 2.5 cm
+        # center point
+        cx_i, cy_i = int(cx), int(cy)
+        cv2.circle(frame, (cx_i, cy_i), 4, (0, 0, 255), -1)
 
-        # ---------------------------------
+        # pixel → world
+        Xw, Yw = pixel_to_world(cx, cy)
 
-        # Draw visualization
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (0,255,0), 2)
-        cv2.circle(frame, (cx, cy), 4, (0,0,255), -1)
+        # optional camera offset, if you still use it:
+        # Xw += offset_x_mm
+        # Yw += offset_y_mm
+
+        # angle note:
+        # OpenCV gives angle in range [-90, 0) degrees.
+        # You can normalize if you prefer 0–180:
+        # if w < h: angle = angle + 90
+
         cv2.putText(
             frame,
-            f"Center ({X:.1f},{Y:.1f})",
-            (x, y-5),
+            f"Center ({Xw:.1f},{Yw:.1f})",
+            (cx_i + 5, cy_i - 5),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
-            (255,255,0),
+            (255, 255, 0),
             1
         )
 
-    cv2.imshow("Contrast-based Detection → Real Coordinates", frame)
+        cv2.putText(
+            frame,
+            f"angle {angle:.1f} deg",
+            (cx_i + 5, cy_i + 15),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 255, 255),
+            1
+        )
+        # --------------------------------------
+
+    cv2.imshow("Tilt detection (minAreaRect)", frame)
     key = cv2.waitKey(1) & 0xFF
     if key == 27:
         break
