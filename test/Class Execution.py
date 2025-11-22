@@ -62,6 +62,12 @@ class JetArmGripper:
         self.Arm = Arm
         self.openGripperPulse = 0
         self.closeGripperPulse = 1000
+
+    def wrist_to_pulse(self, angle_deg):
+        return int(round(angle_deg / self.DEG_PER_PULSE + self.BASE_ZERO_OFFSET))
+    def turn_wrist(self, angle):
+        wrist_pulse = self.wrist_to_pulse(angle)
+        self.Arm.moveJetArm(5, wrist_pulse)
     def close_gripper(self):
         self.Arm.moveJetArm(10, self.closeGripperPulse)
     def open_gripper(self):
