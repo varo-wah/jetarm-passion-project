@@ -33,7 +33,7 @@ if ELBOW_UP:
     L1_angle = phi + theta
 else:
     L1_angle = phi - theta
-# L1 angle, refer to Easy Inverse Kinematics for Robot Arms by RoTechnic
+# L1 angle, refer to Easy Inverse Kinematics testing for Robot Arms by RoTechnic
 
 # L2 angle section
 Intersection = 180 - (2 * theta)
