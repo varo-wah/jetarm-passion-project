@@ -42,6 +42,14 @@ while True:
         # rect = ((cx, cy), (w, h), angle)
         (cx, cy), (w, h), angle = rect
 
+        # Normalize angle so it always follows the LONGEST rectangle side
+        # (gripper left–right direction) and lies within [0, 180).
+        # OpenCV reports the angle for the short side in [-90, 0).
+        if h > w:
+            angle += 90.0
+
+        angle = angle % 180.0
+
         # convert box points to int and draw rotated rectangle
         box = cv2.boxPoints(rect)
         box = np.int32(box)
@@ -57,11 +65,6 @@ while True:
         # optional camera offset, if you still use it:
         # Xw += offset_x_mm
         # Yw += offset_y_mm
-
-        # angle note:
-        # OpenCV gives angle in range [-90, 0) degrees.
-        # You can normalize if you prefer 0–180:
-        # if w < h: angle = angle + 90
 
         cv2.putText(
             frame,
