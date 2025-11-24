@@ -1,24 +1,16 @@
-"""Compute homography with centered X=0 and bottom Y=100 mm reference.
+"""Compute homography with centered X=0 and bottom Y=10 mm reference.
 
 Running ``python3 dotcheckhomography.py`` will:
 - Open the default camera.
 - Detect a 7x10 symmetric circle grid with 30 mm dot spacing.
 - Map image-space corners to world coordinates where X=0 is at the camera
-  center and the bottom of the frame is Y=100 mm.
+  center and the bottom of the frame is Y=10 mm.
 - Save the resulting homography to ``Vision/dotcheckhomography.npy``.
 - Display the camera feed with detected circle centers drawn.
-
-Note:
-- If you previously saw a world Y value around -10 when the bottom reference
-  was 10 mm, that happens when the grid-derived pixel-to-mm scale places the
-  detected corners slightly "below" the assumed bottom. With the bottom fixed
-  to a given millimeter height, any portion of the grid that the scale
-  extrapolates beneath that line will show as a negative offset even though
-  the camera frame itself is intact.
 """
 
 from pathlib import Path
-from typing import Callable, Tuple
+from typing import Tuple
 
 import cv2
 import numpy as np
@@ -39,48 +31,22 @@ def reshape_grid_points(centers: np.ndarray) -> np.ndarray:
     return centers.reshape(ROWS, COLS, 2)
 
 
-def build_pixel_to_world(  # noqa: PLR0913
-    frame_shape: Tuple[int, int],
-    grid_corners: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
-    visible_width_mm: float,
-    visible_height_mm: float,
-) -> Callable[[np.ndarray], np.ndarray]:
-    """Create a converter from pixel coordinates to world coordinates.
+def build_world_grid(y_bottom_mm: float) -> np.ndarray:
+    """Construct world coordinates for every grid dot.
 
-    World axes are anchored to the camera frame so that:
-    - X=0 lies at the horizontal center of the camera.
-    - Y=100 mm lies at the bottom of the camera frame and increases upward.
-
-    Scaling comes from the detected grid so the mapping remains consistent
-    even when the printed pattern occupies only part of the frame.
+    X is centered so that the mid-column lies at 0. Y starts at ``y_bottom_mm``
+    for the bottom row and increases upward by the dot spacing.
     """
 
-    bottom_left, bottom_right, top_right, top_left = grid_corners
+    half_w = ((COLS - 1) * DOT_SPACING_MM) / 2.0
+    visible_height_mm = (ROWS - 1) * DOT_SPACING_MM
+    y_top = y_bottom_mm + visible_height_mm
 
-    grid_pixel_width = float(bottom_right[0] - bottom_left[0])
-    grid_pixel_height = float(top_left[1] - bottom_left[1])
-    if grid_pixel_width == 0 or grid_pixel_height == 0:
-        raise ValueError("Invalid grid dimensions detected in pixels.")
+    x_coords = (np.arange(COLS) - (COLS - 1) / 2.0) * DOT_SPACING_MM
+    y_coords = y_top - np.arange(ROWS) * DOT_SPACING_MM
 
-    mm_per_px_x = visible_width_mm / grid_pixel_width
-    mm_per_px_y = visible_height_mm / abs(grid_pixel_height)
-
-    frame_height, frame_width = frame_shape[:2]
-    cx = frame_width / 2.0
-    bottom_px = frame_height - 1
-
-    BOTTOM_Y_MM = 100.0
-
-    def pixel_to_world(pts: np.ndarray) -> np.ndarray:
-        pts = np.asarray(pts, dtype=np.float32)
-        px = pts[..., 0]
-        py = pts[..., 1]
-
-        wx = (px - cx) * mm_per_px_x
-        wy = BOTTOM_Y_MM + (bottom_px - py) * mm_per_px_y
-        return np.stack([wx, wy], axis=-1).astype(np.float32)
-
-    return pixel_to_world
+    xs, ys = np.meshgrid(x_coords, y_coords)
+    return np.stack([xs, ys], axis=-1).astype(np.float32)
 
 
 def main() -> int:
@@ -91,12 +57,29 @@ def main() -> int:
 
     visible_width_mm = (COLS - 1) * DOT_SPACING_MM
     visible_height_mm = (ROWS - 1) * DOT_SPACING_MM
+    half_w = visible_width_mm / 2.0
+
+    y_bottom = 10.0
+    y_top = y_bottom + visible_height_mm
+
+    world_pts = np.array(
+        [
+            [-half_w, y_bottom],  # bottom-left
+            [half_w, y_bottom],  # bottom-right
+            [half_w, y_top],  # top-right
+            [-half_w, y_top],  # top-left
+        ],
+        dtype=np.float32,
+    )
 
     print(f"Visible grid width (mm): {visible_width_mm:.2f}")
     print(f"Visible grid height (mm): {visible_height_mm:.2f}")
+    print("World coordinates (mm) for corners:")
+    print(world_pts)
 
+    world_grid = build_world_grid(y_bottom)
     homography_computed = False
-    
+
     try:
         while True:
             ret, frame = camera.read()
@@ -126,41 +109,23 @@ def main() -> int:
                     dtype=np.float32,
                 )
 
-                try:
-                    pixel_to_world = build_pixel_to_world(
-                        frame.shape,
-                        (bottom_left, bottom_right, top_right, top_left),
-                        visible_width_mm,
-                        visible_height_mm,
-                    )
-                except ValueError as exc:
-                    print(f"Warning: {exc}")
-                    pixel_to_world = None
+                H, _ = cv2.findHomography(img_pts, world_pts)
+                if H is None:
+                    print("Warning: Homography computation failed.")
+                else:
+                    print("Homography matrix:")
+                    print(H)
 
-                if pixel_to_world is not None:
-                    world_pts = pixel_to_world(img_pts)
-                    world_grid = pixel_to_world(grid_points)
+                    all_img_pts = centers.reshape(-1, 1, 2)
+                    reprojected = cv2.perspectiveTransform(all_img_pts, H).reshape(-1, 2)
+                    world_flat = world_grid.reshape(-1, 2)
+                    diff = reprojected - world_flat
+                    rms_error = np.sqrt(np.mean(np.sum(diff ** 2, axis=1)))
+                    print(f"RMS reprojection error (mm): {rms_error:.4f}")
 
-                    print("World coordinates (mm) for corners:")
-                    print(world_pts)
-
-                    H, _ = cv2.findHomography(img_pts, world_pts)
-                    if H is None:
-                        print("Warning: Homography computation failed.")
-                    else:
-                        print("Homography matrix:")
-                        print(H)
-
-                        all_img_pts = centers.reshape(-1, 1, 2)
-                        reprojected = cv2.perspectiveTransform(all_img_pts, H).reshape(-1, 2)
-                        world_flat = world_grid.reshape(-1, 2)
-                        diff = reprojected - world_flat
-                        rms_error = np.sqrt(np.mean(np.sum(diff ** 2, axis=1)))
-                        print(f"RMS reprojection error (mm): {rms_error:.4f}")
-
-                        np.save(OUTPUT_PATH, H)
-                        print(f"Homography saved to: {OUTPUT_PATH}")
-                        homography_computed = True
+                    np.save(OUTPUT_PATH, H)
+                    print(f"Homography saved to: {OUTPUT_PATH}")
+                    homography_computed = True
 
             else:
                 cv2.putText(
