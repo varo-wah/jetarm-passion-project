@@ -1,196 +1,171 @@
-"""Detect a symmetric circle grid and compute an image-to-world homography.
-
-Running ``python3 dothomography.py`` will:
-- Open the default camera.
-- Detect a 7x10 symmetric circle grid with 30 mm dot spacing.
-- Map image-space corners to world coordinates centered on the grid with an
-  80 mm offset on the Y axis.
-- Save the resulting homography to ``Vision/dothomography.npy``.
-- Display the camera feed with detected circle centers drawn.
-"""
-
-from pathlib import Path
-from typing import Tuple
-"""Compute a homography from a detected symmetric circle grid.
-
-This script opens the default camera, searches for a 7x10 circle grid with
-30 mm spacing and 10 mm diameter dots, estimates a homography that maps image
-coordinates to real-world coordinates, reports RMS error, and saves the
-homography matrix to ``Vision/dothomography.npy``.
-"""
-
-import sys
-from pathlib import Path
-
 import cv2
 import numpy as np
+from pathlib import Path
 
+# ============================================================
+# Configuration
+# ============================================================
 
-# Grid definition
 ROWS = 7
 COLS = 10
-DOT_SPACING_MM = 30.0
-PATTERN_SIZE: Tuple[int, int] = (COLS, ROWS)  # (columns, rows) for cv2.findCirclesGrid
-DOT_DIAMETER_MM = 10.0  # Not used directly but documented for clarity
-PATTERN_SIZE = (COLS, ROWS)  # (columns, rows) for cv2.findCirclesGrid
+DOT_SPACING = 30.0   # mm
+PATTERN_SIZE = (COLS, ROWS)
 
-# Output path
-OUTPUT_PATH = Path(__file__).resolve().parent / "dothomography.npy"
+OUTPUT_DIR = Path(__file__).resolve().parent
+H_SHEET_PATH = OUTPUT_DIR / "homography_sheet.npy"
+AFFINE_PATH   = OUTPUT_DIR / "affine_sheet_to_robot.npy"
 
+# Your 3 measured anchor points (sheet → robot)
+sheet_pts = np.array([
+    [270, 180],   # Dot A sheet
+    [0,   180],   # Dot B sheet
+    [60,   90],   # Dot C sheet
+], dtype=np.float32)
 
-def reshape_grid_points(centers: np.ndarray) -> np.ndarray:
-    """Reshape detected centers into (rows, cols, 2) using OpenCV's ordering.
+robot_pts = np.array([
+    [125, 120],    # Dot A robot
+    [-180,120],    # Dot B robot
+    [-110,225],    # Dot C robot
+], dtype=np.float32)
 
-    ``cv2.findCirclesGrid`` returns the points in row-major order (top-to-bottom,
-    left-to-right) irrespective of slant or how much of the camera frame the
-    paper occupies. By reshaping directly, we avoid mis-ordering when the grid
-    appears slanted in the image.
-    """
+# ============================================================
+# Helper: pixel → sheet using homography
+# ============================================================
 
-    flat = centers.reshape(-1, 2)
-    return flat.reshape(ROWS, COLS, 2)
-def generate_world_points(rows: int, cols: int, spacing: float) -> np.ndarray:
-    """Create world coordinates for the symmetric grid.
+def pixel_to_sheet(u, v, H_sheet):
+    pt = np.array([[[u, v]]], dtype=np.float32)
+    out = cv2.perspectiveTransform(pt, H_sheet)[0][0]
+    return float(out[0]), float(out[1])
 
-    The origin is the top-left dot. Points are ordered row-major to match
-    ``cv2.findCirclesGrid`` output.
-    """
-    # columns change fastest, then rows (x corresponds to columns, y to rows)
-    column_indices, row_indices = np.meshgrid(np.arange(cols), np.arange(rows))
-    x_coords = column_indices.astype(np.float32) * spacing
-    y_coords = row_indices.astype(np.float32) * spacing
-    world_points = np.stack((x_coords, y_coords), axis=-1)
-    return world_points.reshape(-1, 2)
+# ============================================================
+# Helper: sheet → robot using affine transform
+# ============================================================
 
+def sheet_to_robot(Xs, Ys, A):
+    v = np.array([[Xs, Ys, 1.0]], dtype=np.float32).T
+    r = A @ v
+    return float(r[0]), float(r[1])
 
-def compute_rms_error(homography: np.ndarray, img_pts: np.ndarray, world_pts: np.ndarray) -> float:
-    """Project image points using the homography and compute RMS error."""
-    projected = cv2.perspectiveTransform(img_pts.reshape(-1, 1, 2), homography)
-    residuals = world_pts.reshape(-1, 1, 2) - projected
-    squared_error = np.square(residuals).sum(axis=2)
-    rms = np.sqrt(np.mean(squared_error))
-    return float(rms)
+# ============================================================
+# Calibration Script
+# ============================================================
 
+def main():
+    print("Opening camera...")
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("ERROR: Cannot open camera.")
+        return
 
-def main() -> int:
-    camera = cv2.VideoCapture(0)
-    if not camera.isOpened():
-        print("Error: Could not open camera 0.")
-        return 1
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Failed to grab frame.")
+            continue
 
-    visible_width_mm = (COLS - 1) * DOT_SPACING_MM
-    visible_height_mm = (ROWS - 1) * DOT_SPACING_MM
-    half_w = visible_width_mm / 2.0
-    y0 = 80.0
-    y1 = y0 + visible_height_mm
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    world_pts = np.array(
-        [
-            [-half_w, y0],  # bottom-left
-            [half_w, y0],  # bottom-right
-            [half_w, y1],  # top-right
-            [-half_w, y1],  # top-left
-        ],
-        dtype=np.float32,
-    )
+        found, centers = cv2.findCirclesGrid(
+            gray,
+            PATTERN_SIZE,
+            flags=cv2.CALIB_CB_SYMMETRIC_GRID
+        )
 
-    print(f"Visible grid width (mm): {visible_width_mm:.2f}")
-    print(f"Visible grid height (mm): {visible_height_mm:.2f}")
-    print("World coordinates (mm):")
-    print(world_pts)
+        display = frame.copy()
 
-    world_points = generate_world_points(ROWS, COLS, DOT_SPACING_MM)
-    homography_computed = False
+        if found:
+            cv2.drawChessboardCorners(display, PATTERN_SIZE, centers, found)
+            print("Dot grid detected.")
 
-    try:
-        while True:
-            ret, frame = camera.read()
-            if not ret or frame is None:
-                print("Warning: Failed to grab frame from camera.")
-                continue
+            # ------------------------------------------------------------
+            # 1. Compute pixel → sheet homography
+            # ------------------------------------------------------------
+            img_pts = centers.reshape(-1,2)
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            found, centers = cv2.findCirclesGrid(
-                gray,
-                PATTERN_SIZE,
-                flags=cv2.CALIB_CB_SYMMETRIC_GRID,
-            )
+            sheet_coords = []
+            for r in range(ROWS):
+                for c in range(COLS):
+                    sheet_coords.append([c * DOT_SPACING, r * DOT_SPACING])
+            sheet_coords = np.array(sheet_coords, dtype=np.float32)
 
-            display = frame.copy()
-            if found:
-                cv2.drawChessboardCorners(display, PATTERN_SIZE, centers, found)
-                grid_points = reshape_grid_points(centers)
+            H_sheet, _ = cv2.findHomography(img_pts, sheet_coords)
+            np.save(H_SHEET_PATH, H_sheet)
+            print("Saved pixel→sheet homography to:", H_SHEET_PATH)
 
-                bottom_left = grid_points[-1, 0]
-                bottom_right = grid_points[-1, -1]
-                top_right = grid_points[0, -1]
-                top_left = grid_points[0, 0]
+            # ------------------------------------------------------------
+            # 2. Compute sheet → robot affine transform
+            # ------------------------------------------------------------
+            # We need a 2x3 matrix A where:
+            # [Xr, Yr]^T = A * [Xs, Ys, 1]^T
 
-                img_pts = np.array(
-                    [bottom_left, bottom_right, top_right, top_left],
-                    dtype=np.float32,
-                )
+            # construct linear system
+            M = []
+            b = []
+            for i in range(3):
+                Xs, Ys = sheet_pts[i]
+                Xr, Yr = robot_pts[i]
 
-                H, _ = cv2.findHomography(img_pts, world_pts)
-                if H is None:
-                    print("Warning: Homography computation failed.")
-                else:
-                    print("Homography matrix:")
-                    print(H)
-                    reprojected = cv2.perspectiveTransform(
-                        img_pts.reshape(-1, 1, 2), H
-                    ).reshape(-1, 2)
-                    diff = reprojected - world_pts
-                    rms_error = np.sqrt(np.mean(np.sum(diff ** 2, axis=1)))
-                    print(f"RMS reprojection error (mm): {rms_error:.4f}")
-                    np.save(OUTPUT_PATH, H)
-                    print(f"Homography saved to: {OUTPUT_PATH}")
-                    homography_computed = True
+                M.append([Xs, Ys, 1, 0,  0, 0])
+                M.append([0,  0,  0, Xs, Ys, 1])
+                b.append(Xr)
+                b.append(Yr)
 
-                # Draw detected centers for visualization
-                cv2.drawChessboardCorners(display, PATTERN_SIZE, centers, found)
+            M = np.array(M, dtype=np.float32)
+            b = np.array(b, dtype=np.float32).reshape(-1,1)
 
-                # Compute homography once a valid detection is found
-                H, mask = cv2.findHomography(centers.reshape(-1, 2), world_points, method=0)
-                if H is not None:
-                    rms_error = compute_rms_error(H, centers.reshape(-1, 2), world_points)
-                    print(f"Homography computed. RMS projection error: {rms_error:.3f} mm")
-                    np.save(OUTPUT_PATH, H)
-                    print(f"Homography saved to: {OUTPUT_PATH}")
-                    homography_computed = True
-                else:
-                    print("Warning: Homography computation failed.")
-            else:
-                cv2.putText(
-                    display,
-                    "Circle grid not found",
-                    (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1.0,
-                    (0, 0, 255),
-                    2,
-                    cv2.LINE_AA,
-                )
+            params, _, _, _ = np.linalg.lstsq(M, b, rcond=None)
+            A = params.reshape(2,3)
+            np.save(AFFINE_PATH, A)
+            print("Saved sheet→robot affine transform to:", AFFINE_PATH)
+            print("Affine matrix:\n", A)
 
-            cv2.imshow("Circle Grid Detection", display)
-            key = cv2.waitKey(1) & 0xFF
-            if homography_computed or key == ord("q"):
-            if key == ord("q"):
-                break
-            if homography_computed:
-                # Stop after computing the first valid homography
-                break
-    finally:
-        camera.release()
-        cv2.destroyAllWindows()
+            # ------------------------------------------------------------
+            # 3. Test RMS error (pixel→sheet→robot)
+            # ------------------------------------------------------------
+            total_err = 0
+            count = 0
 
-    if not homography_computed:
-        print("Circle grid was not detected. Homography not saved.")
-        return 1
+            for i in range(len(img_pts)):
+                u, v = img_pts[i]
 
-    return 0
+                xs, ys = pixel_to_sheet(u, v, H_sheet)
+                xr, yr = sheet_to_robot(xs, ys, A)
+
+                # predict robot coords of this dot
+                # what SHOULD the sheet coords be?
+                r = i // COLS
+                c = i % COLS
+                Xs_true = c * DOT_SPACING
+                Ys_true = r * DOT_SPACING
+
+                # convert true sheet coords → robot coords
+                Xr_true, Yr_true = sheet_to_robot(Xs_true, Ys_true, A)
+
+                err = ( (xr - Xr_true)**2 + (yr - Yr_true)**2 )**0.5
+                total_err += err
+                count += 1
+
+            rms = total_err / count
+            print(f"RMS robot-space error: {rms:.3f} mm")
+
+            # ------------------------------------------------------------
+            # Display
+            # ------------------------------------------------------------
+            cv2.imshow("dothomography", display)
+            cv2.waitKey(0)
+            break
+
+        else:
+            cv2.putText(display, "Dot grid NOT found", (20,40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+            cv2.imshow("dothomography", display)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
-    sys.exit(main())
+    main()

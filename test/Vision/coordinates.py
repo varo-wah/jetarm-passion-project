@@ -1,14 +1,80 @@
 import cv2
 import numpy as np
 
-# Load homography
-H = np.load("autohomography.npy")
+# =====================================================
+# Load calibration matrices
+# =====================================================
 
-def pixel_to_world(u, v):
+# Pixel → sheet_mm
+H_sheet = np.load("homography_sheet.npy")
+
+# Sheet_mm → robot_mm (2×3 affine matrix)
+A_robot = np.load("affine_sheet_to_robot.npy")
+
+
+# =====================================================
+# Coordinate helpers
+# =====================================================
+
+def pixel_to_sheet(u, v):
+    """Convert (pixel u,v) → (sheet_x, sheet_y) mm."""
     pt = np.array([[[u, v]]], dtype=np.float32)
-    real = cv2.perspectiveTransform(pt, H)
-    X, Y = real[0][0]
-    return float(X), float(Y)
+    out = cv2.perspectiveTransform(pt, H_sheet)[0][0]
+    return float(out[0]), float(out[1])
+
+
+def sheet_to_robot(xs, ys):
+    """Convert sheet mm → robot mm using affine transform."""
+    vec = np.array([xs, ys, 1.0], dtype=np.float32)
+    xr, yr = A_robot @ vec
+    return float(xr), float(yr)
+
+
+def pixel_to_robot(u, v):
+    """Full chain: pixel → sheet_mm → robot_mm."""
+    xs, ys = pixel_to_sheet(u, v)
+    return sheet_to_robot(xs, ys)
+
+
+# =====================================================
+# COLOR DETECTION
+# =====================================================
+
+def detect_color(frame, x, y, w, h):
+    """Detect LEGO pink, yellow, cyan."""
+    roi = frame[y:y+h, x:x+w]
+
+    if roi.size == 0:
+        return "unknown"
+
+    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+
+    # compute average HSV values
+    avg_h = np.mean(hsv[:,:,0])
+    avg_s = np.mean(hsv[:,:,1])
+    avg_v = np.mean(hsv[:,:,2])
+
+    # ---- LEGO COLORS ----
+
+    # Pink (magenta range)
+    if 140 <= avg_h <= 170 and avg_s > 80:
+        return "pink"
+
+    # Yellow
+    if 20 <= avg_h <= 35 and avg_s > 80:
+        return "yellow"
+
+    # Cyan / light blue
+    if 85 <= avg_h <= 105 and avg_s > 80:
+        return "cyan"
+
+    return "unknown"
+
+
+
+# =====================================================
+# Object + angle detection pipeline
+# =====================================================
 
 cap = cv2.VideoCapture(0)
 
@@ -20,7 +86,6 @@ while True:
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # Contrast-based segmentation
     thresh = cv2.adaptiveThreshold(
         blur, 255,
         cv2.ADAPTIVE_THRESH_MEAN_C,
@@ -37,39 +102,36 @@ while True:
         if area < 400 or area > 20000:
             continue
 
-        # --- key part: minAreaRect for tilt ---
+        # -------------------------
+        #   ANGLE LOGIC
+        # -------------------------
         rect = cv2.minAreaRect(c)
-        # rect = ((cx, cy), (w, h), angle)
         (cx, cy), (w, h), angle = rect
 
-        # Normalize angle so it always follows the LONGEST rectangle side
-        # (gripper left–right direction) and lies within [0, 180).
-        # OpenCV reports the angle for the short side in [-90, 0).
         if h > w:
-            angle += 90.0
+            angle += 90
+        angle = angle % 180
 
-        angle = angle % 180.0
+        # Compute bounding box for color
+        x, y, bw, bh = cv2.boundingRect(c)
+        color_name = detect_color(frame, x, y, bw, bh)
 
-        # convert box points to int and draw rotated rectangle
+        # Draw rotated rectangle
         box = cv2.boxPoints(rect)
         box = np.int32(box)
         cv2.drawContours(frame, [box], 0, (0, 255, 0), 2)
 
-        # center point
+        # Center dot
         cx_i, cy_i = int(cx), int(cy)
         cv2.circle(frame, (cx_i, cy_i), 4, (0, 0, 255), -1)
 
-        # pixel → world
-        Xw, Yw = pixel_to_world(cx, cy)
-
-        # optional camera offset, if you still use it:
-        # Xw += offset_x_mm
-        # Yw += offset_y_mm
+        # Pixel → robot
+        Xr, Yr = pixel_to_robot(cx, cy)
 
         cv2.putText(
             frame,
-            f"Center ({Xw:.1f},{Yw:.1f})",
-            (cx_i + 5, cy_i - 5),
+            f"Robot ({Xr:.1f}, {Yr:.1f})",
+            (x, y - 10),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (255, 255, 0),
@@ -78,16 +140,25 @@ while True:
 
         cv2.putText(
             frame,
-            f"angle {angle:.1f} deg",
-            (cx_i + 5, cy_i + 15),
+            f"Angle {angle:.1f}",
+            (x, y + 15),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (0, 255, 255),
             1
         )
-        # --------------------------------------
 
-    cv2.imshow("Tilt detection (minAreaRect)", frame)
+        cv2.putText(
+            frame,
+            f"Color: {color_name}",
+            (x, y + 35),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 255, 0),
+            1
+        )
+
+    cv2.imshow("Coordinates → Robot", frame)
     key = cv2.waitKey(1) & 0xFF
     if key == 27:
         break

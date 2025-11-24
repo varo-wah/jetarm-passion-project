@@ -41,6 +41,8 @@ class JetArmIK:
             L2_angle = 360 - (intersection + 90)
 
         L3_angle = 90 - (L2_angle + L1_angle)
+        
+        self.last_base_angle = base_angle
 
         return base_angle, L1_angle, L2_angle, L3_angle
 
@@ -57,6 +59,7 @@ class JetArmIK:
         self.Arm.moveJetArm(2, L1_pulse)
         self.Arm.moveJetArm(3, L2_pulse)
         self.Arm.moveJetArm(4, L3_pulse)
+
 class JetArmGripper:
     def __init__(self):
         self.Arm = Arm
@@ -68,7 +71,9 @@ class JetArmGripper:
     def wrist_to_pulse(self, angle_deg):
         return int(round(angle_deg / self.DEG_PER_PULSE + self.WRIST_ZERO_OFFSET))
     def turn_wrist(self, angle):
-        wrist_pulse = self.wrist_to_pulse(angle)
+        base_angle = ik.last_base_angle
+        final_angle = (angle - 90) + base_angle
+        wrist_pulse = self.wrist_to_pulse(final_angle)
         self.Arm.moveJetArm(5, wrist_pulse)
     def close_gripper(self):
         self.Arm.moveJetArm(10, self.closeGripperPulse)
