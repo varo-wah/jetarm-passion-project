@@ -5,7 +5,7 @@ Running ``python3 dotcheckhomography.py`` will:
 - Detect a 7x10 symmetric circle grid with 30 mm dot spacing.
 - Map image-space corners to world coordinates where X=0 is at the camera
   center and the bottom of the frame is Y=10 mm.
-- Save the resulting homography to ``Vision/dotcheckhomography.npy``.
+- Save the resulting homography to ``Vision testing/dotcheckhomography.npy``.
 - Display the camera feed with detected circle centers drawn.
 """
 

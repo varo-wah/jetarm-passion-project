@@ -1,15 +1,17 @@
 import cv2
 import numpy as np
+import os
+BASE = "/home/ubuntu/jetarm-passion-project/test/Vision_testing"
 
 # =====================================================
 # Load calibration matrices
 # =====================================================
 
 # Pixel → sheet_mm
-H_sheet = np.load("homography_sheet.npy")
+H_sheet = np.load(os.path.join(BASE, "homography_sheet.npy"))
 
 # Sheet_mm → robot_mm (2×3 affine matrix)
-A_robot = np.load("affine_sheet_to_robot.npy")
+A_robot = np.load(os.path.join(BASE, "affine_sheet_to_robot.npy"))
 
 
 # =====================================================

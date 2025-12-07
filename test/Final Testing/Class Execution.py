@@ -85,6 +85,7 @@ class ComputerVision:
     def scan_position(self): 
         self.ik.move_to(0, 15, 23)
 
+
 ik = JetArmIK()
 gripper = JetArmGripper()
 camera = ComputerVision(ik)
