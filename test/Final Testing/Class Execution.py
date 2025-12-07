@@ -1,3 +1,9 @@
+import sys, os
+
+# Add parent directory of this file to the module search path
+PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(PARENT_DIR)
+
 from classCreation import CKMJetArm
 Arm = CKMJetArm()
 import math
@@ -65,6 +71,8 @@ class JetArmGripper:
         self.Arm = Arm
         self.openGripperPulse = 0
         self.closeGripperPulse = 1000
+        self.BASE_ZERO_OFFSET = 125.0
+        self.DEG_PER_PULSE = 0.24
 
     def wrist_to_pulse(self, angle_deg):
         return int(round(angle_deg / self.DEG_PER_PULSE + self.BASE_ZERO_OFFSET))

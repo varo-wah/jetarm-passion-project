@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
 import os
-BASE = "/home/ubuntu/jetarm-passion-project/test/Vision_testing"
+BASE = "/home/ubuntu/jetarm-passion-project/test/Vision testing"
+
 
 # =====================================================
 # Load calibration matrices
