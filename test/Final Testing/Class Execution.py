@@ -11,6 +11,7 @@ import rclpy
 from rclpy.node import Node
 from ros_robot_controller_msgs.msg import ServosPosition, ServoPosition
 
+
 class JetArmIK:
     def __init__(self):
         self.Arm = Arm
@@ -92,7 +93,6 @@ class ComputerVision:
         self.ik = ik
     def scan_position(self): 
         self.ik.move_to(0, 15, 23)
-
 
 ik = JetArmIK()
 gripper = JetArmGripper()
