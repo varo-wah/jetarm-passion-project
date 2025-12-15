@@ -3,6 +3,13 @@ import numpy as np
 import os
 BASE = "/home/ubuntu/jetarm-passion-project/test/Vision_testing"
 
+# NOTE: smoothing buffers are global and ONLY for visual debugging
+# Do NOT reuse this logic for automated picking
+# Smoothing buffers for coordinates
+X_history = []
+Y_history = []
+SMOOTH_N = 5   # number of frames to smooth
+
 # =====================================================
 # Load calibration matrices
 # =====================================================
@@ -127,12 +134,33 @@ while True:
         cx_i, cy_i = int(cx), int(cy)
         cv2.circle(frame, (cx_i, cy_i), 4, (0, 0, 255), -1)
 
-        # Pixel → robot
-        Xr, Yr = pixel_to_robot(cx, cy)
+        # -----------------------------------------
+        # Pixel → robot (raw)
+        # -----------------------------------------
+        Xr_raw, Yr_raw = pixel_to_robot(cx, cy)
 
+        # -----------------------------------------
+        # Add to smoothing history
+        # -----------------------------------------
+        Xr = Xr_raw
+        Yr = Yr_raw
+
+        # Limit history length
+        if len(X_history) > SMOOTH_N:
+            X_history.pop(0)
+        if len(Y_history) > SMOOTH_N:
+            Y_history.pop(0)
+
+        # Compute smoothed values
+        Xr = sum(X_history) / len(X_history)
+        Yr = sum(Y_history) / len(Y_history)
+
+        # -----------------------------------------
+        # Display smoothed result
+        # -----------------------------------------
         cv2.putText(
             frame,
-            f"Robot ({Xr:.1f}, {Yr:.1f})",
+            f"Coordinates ({Xr:.1f}, {Yr:.1f})",
             (x, y - 10),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
