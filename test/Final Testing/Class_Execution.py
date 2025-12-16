@@ -98,13 +98,14 @@ ik = JetArmIK()
 gripper = JetArmGripper()
 camera = ComputerVision(ik)
 
-while True:
-    try:
-        code = input(">>> ")
-        if code.lower() in ['exit', 'quit']:
-            break
-        exec(code)
-    except Exception as e:
-        print(f"❌ Error: {e}")
+if __name__ == "__main__":
+    while True:
+        try:
+            code = input(">>> ")
+            if code.lower() in ['exit', 'quit']:
+                break
+            exec(code)
+        except Exception as e:
+            print(f"❌ Error: {e}")
 
 
