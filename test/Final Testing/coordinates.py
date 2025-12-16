@@ -155,7 +155,7 @@ while True:
         # Xr = sum(X_history) / len(X_history)
         # Yr = sum(Y_history) / len(Y_history)
 
-        # -----------------------------------------
+        # ----------------------------------------
         # Display smoothed result
         # -----------------------------------------
         cv2.putText(
