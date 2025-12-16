@@ -6,7 +6,7 @@ import os
 # =====================================================
 # Calibration paths
 # =====================================================
-BASE = "/home/ubuntu/jetarm-passion-project/test/Vision_testing"
+BASE = "/home/ubuntu/jetarm-passion-project/test/Vision testing"
 
 H_sheet = np.load(os.path.join(BASE, "homography_sheet.npy"))
 A_robot = np.load(os.path.join(BASE, "affine_sheet_to_robot.npy"))

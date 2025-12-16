@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import os
-BASE = "/home/ubuntu/jetarm-passion-project/test/Vision_testing"
+BASE = "/home/ubuntu/jetarm-passion-project/test/Vision testing"
 
 # NOTE: smoothing buffers are global and ONLY for visual debugging
 # Do NOT reuse this logic for automated picking
@@ -151,9 +151,9 @@ while True:
         if len(Y_history) > SMOOTH_N:
             Y_history.pop(0)
 
-        # Compute smoothed values
-        Xr = sum(X_history) / len(X_history)
-        Yr = sum(Y_history) / len(Y_history)
+        # # Compute smoothed values
+        # Xr = sum(X_history) / len(X_history)
+        # Yr = sum(Y_history) / len(Y_history)
 
         # -----------------------------------------
         # Display smoothed result
