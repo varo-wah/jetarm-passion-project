@@ -60,7 +60,7 @@ class JetArmIK:
         L1_pulse = self.arm_to_pulse(L1_angle)
         L2_pulse = self.arm_to_pulse(L2_angle)
         L3_pulse = self.arm_to_pulse(L3_angle) + 35
-
+        
         print(f"Moving to: {base_pulse}, {L1_pulse}, {L2_pulse}, {L3_pulse}")
         self.Arm.moveJetArm(1, base_pulse)
         self.Arm.moveJetArm(2, L1_pulse)
@@ -88,15 +88,18 @@ class JetArmGripper:
         self.Arm.moveJetArm(10, self.openGripperPulse)
 
 class ComputerVision:
-    def __init__(self, ik):
+    def __init__(self, ik, gripper):
         self.Arm = Arm
         self.ik = ik
+        self.gripper = gripper
     def scan_position(self): 
         self.ik.move_to(0, 15, 23)
+        self.gripper.turn_wrist(90)
+        self.gripper.open_gripper()
 
 ik = JetArmIK()
 gripper = JetArmGripper()
-camera = ComputerVision(ik)
+camera = ComputerVision(ik, gripper)
 
 if __name__ == "__main__":
     while True:

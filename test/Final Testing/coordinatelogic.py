@@ -27,7 +27,13 @@ def sheet_to_robot(xs, ys):
 
 def pixel_to_robot(u, v):
     xs, ys = pixel_to_sheet(u, v)
-    return sheet_to_robot(xs, ys)
+    xr_mm, yr_mm = sheet_to_robot(xs, ys)   # currently mm
+
+    # Convert mm -> cm (move decimal one place left)
+    xr_cm = xr_mm / 10.0
+    yr_cm = yr_mm / 10.0
+
+    return xr_cm, yr_cm
 
 # =====================================================
 # Color detection
