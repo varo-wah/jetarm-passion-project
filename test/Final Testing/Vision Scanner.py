@@ -35,7 +35,7 @@ def pick_and_drop(brick):
     gripper.turn_wrist(angle)
     print(f"🧭 ALIGN WRIST  •  target angle={angle:.1f}°")
 
-    time.sleep(2)
+    time.sleep(0.5)
 
     # Pick
     ik.move_to(x, y, PICK_Z)
@@ -46,7 +46,7 @@ def pick_and_drop(brick):
     print("-"*52)
     print("-"*52)
 
-    time.sleep(2)
+    time.sleep(1)
 
     gripper.close_gripper()
     print("✊ GRIP         •  closing gripper")
@@ -60,7 +60,7 @@ def pick_and_drop(brick):
     print("-"*52)
     print("-"*52)
     print("-"*52)
-    time.sleep(2)
+    time.sleep(0.5)
 
     # Drop in bucket
     ik.move_to(BUCKET_X, BUCKET_Y, APPROACH_Z)
@@ -70,19 +70,19 @@ def pick_and_drop(brick):
     print("-"*52)
     print("-"*52)
     print("-"*52)
-    time.sleep(2)
+    time.sleep(0.5)
 
     ik.move_to(BUCKET_X, BUCKET_Y, DROP_Z)
-    time.sleep(2)
+    time.sleep(0.5)
 
     print(f"⬇️ DROP DOWN    •  z={DROP_Z:.1f}")
     print("🖐️ RELEASE      •  opening gripper")
 
     gripper.open_gripper()
-    time.sleep(2)
+    time.sleep(0.5)
 
     ik.move_to(BUCKET_X, BUCKET_Y, APPROACH_Z)
-    time.sleep(2)
+    time.sleep(0.5)
 
 def main():
     # 1) Scan position
