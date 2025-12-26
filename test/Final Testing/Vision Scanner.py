@@ -1,133 +1,193 @@
-# sorter.py
+# Vision Scanner.py
+# ------------------------------------------------------------
+# Scan → pick 1 → drop → rescan (repeat)
+# ------------------------------------------------------------
+
 import cv2
 import time
 from coordinatelogic import detect_bricks
-from Class_Execution import ik, gripper, camera   # adjust import to your actual file/object names
+from Class_Execution import ik, gripper, camera
 
-BUCKET_X, BUCKET_Y, BUCKET_Z = 15, 0, 10
-
+# =========================
+# SETTINGS (EDIT THESE)
+# =========================
+BUCKET_X, BUCKET_Y = 15, 0
 APPROACH_Z = 15
 PICK_Z = 10.25
 DROP_Z = 15
 
+MAX_PICKS = 50
+
+# Timing (important: prevents command spam / "glitching")
+# Tune MOVE_TIME to match your servo motion duration (often ~1.0s).
+MOVE_TIME = 1.0
+SETTLE_TIME = 0.15
+SCAN_SETTLE = 0.6
+WRIST_SETTLE = 0.35
+GRIP_SETTLE = 0.45
+RELEASE_SETTLE = 0.35
+
+CAM_INDEX = 0
+WARMUP_FRAMES = 5
+
+
+# =========================
+# PRETTY PRINT HELPERS
+# =========================
+def bar(char="-", n=52):
+    print(char * n)
+
+def stage(title, detail=""):
+    print("\n" + "-" * 52)
+    print(title)
+    if detail:
+        print(detail)
+    print("-" * 52)
+
+def print_bricks(bricks):
+    print("\n" + "=" * 52)
+    print(f"📷 Scan complete: {len(bricks)} brick(s) detected")
+    for i, b in enumerate(bricks, 1):
+        print(f"  [{i}] x={b['x']:.2f}, y={b['y']:.2f}, angle={b['angle']:.1f}, color={b['color']}")
+    print("=" * 52)
+
+
+# =========================
+# CAMERA
+# =========================
 def take_snapshot():
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(CAM_INDEX)
+
+    # Warm up exposure/autofocus
+    for _ in range(WARMUP_FRAMES):
+        cap.read()
+
     ret, frame = cap.read()
     cap.release()
+
     if not ret:
         raise RuntimeError("Camera failed to capture frame")
+
     return frame
 
+
+# =========================
+# MOTION WRAPPER
+# =========================
+def move_wait(x, y, z, label):
+    stage(label, f"• Target: x={x:.2f}, y={y:.2f}, z={z:.2f}")
+    ok = ik.move_to(x, y, z)
+    time.sleep(MOVE_TIME + SETTLE_TIME)
+    if not ok:
+        print("⏭ Skipping (unreachable / joint limit)")
+    return ok
+
+
+# =========================
+# SCAN (ONE CYCLE)
+# =========================
+def scan_once():
+    stage("🔎 SCANNING POSITION", "• Moving arm to scan pose")
+    camera.scan_position()
+    time.sleep(SCAN_SETTLE)
+
+    frame = take_snapshot()
+    bricks = detect_bricks(frame)
+
+    print_bricks(bricks)
+    return bricks
+
+
+def choose_brick(bricks):
+    # Closest to origin tends to be most reachable
+    return min(bricks, key=lambda b: (b["x"] ** 2 + b["y"] ** 2))
+
+
+# =========================
+# PICK + DROP (ONE BRICK)
+# =========================
 def pick_and_drop(brick):
     x = brick["x"]
     y = brick["y"]
     angle = brick["angle"]
 
-    # Approach
-    if not ik.move_to(x, y, APPROACH_Z):
-        print("⏭ Skipping target (unreachable)")
-        return
-    print("\n" + "-"*52)
-    print(f"🚀 APPROACHING  •  x={x:.1f}  y={y:.1f}  z={APPROACH_Z:.1f}")
-    print("   • Moving to safe height above the brick")
-    print("-"*52)
+    stage("🎯 SELECTED BRICK",
+          f"• x={x:.2f}, y={y:.2f}, angle={angle:.1f}, color={brick['color']}")
 
+    # 1) Approach above brick
+    if not move_wait(x, y, APPROACH_Z, "🚀 APPROACHING"):
+        return False
 
-    # Align wrist
+    # 2) Wrist align
+    print(f"🧭 ALIGN WRIST  • target angle={angle:.1f}°")
     gripper.turn_wrist(angle)
-    print(f"🧭 ALIGN WRIST  •  target angle={angle:.1f}°")
+    time.sleep(WRIST_SETTLE)
 
-    time.sleep(0.5)
+    # 3) Go down to pick
+    if not move_wait(x, y, PICK_Z, "⬇️ GOING DOWN"):
+        return False
 
-    # Pick
-    if not ik.move_to(x, y, PICK_Z):
-        print("⏭ Skipping target (unreachable)")
-        return
-    print("\n" + "-"*52)
-    print(f"⬇️ GOING DOWN   •  x={x:.1f}  y={y:.1f}  z={PICK_Z:.1f}")
-    print("   • Descending to grasp height")
-    print("-"*52)
-    print("-"*52)
-    print("-"*52)
-
-    time.sleep(1)
-
+    # 4) Grip
+    print("✊ GRIP         • closing gripper")
     gripper.close_gripper()
-    print("✊ GRIP         •  closing gripper")
+    time.sleep(GRIP_SETTLE)
 
-    time.sleep(2)
+    # 5) Lift back up
+    if not move_wait(x, y, APPROACH_Z, "⬆️ LIFTING UP"):
+        print("⚠️ Lift failed after grip — opening gripper for safety")
+        gripper.open_gripper()
+        time.sleep(RELEASE_SETTLE)
+        return False
 
-    if not ik.move_to(x, y, APPROACH_Z):
-        print("⏭ Skipping target (unreachable)")
-        return
-    print("\n" + "-"*52)
-    print(f"⬆️ LIFTING UP   •  x={x:.1f}  y={y:.1f}  z={APPROACH_Z:.1f}")
-    print("   • Lifting brick to safe travel height")
-    print("-"*52)
-    print("-"*52)
-    print("-"*52)
-    time.sleep(0.5)
+    # 6) Move to bucket (approach)
+    if not move_wait(BUCKET_X, BUCKET_Y, APPROACH_Z, "🪣 TO BUCKET"):
+        print("⚠️ Bucket approach unreachable — releasing for safety")
+        gripper.open_gripper()
+        time.sleep(RELEASE_SETTLE)
+        return False
 
-    # Drop in bucket
-    ik.move_to(BUCKET_X, BUCKET_Y, APPROACH_Z)
-    print("\n" + "-"*52)
-    print(f"🪣 TO BUCKET    •  x={BUCKET_X:.1f}  y={BUCKET_Y:.1f}  z={APPROACH_Z:.1f}")
-    print("   • Traveling to drop zone")
-    print("-"*52)
-    print("-"*52)
-    print("-"*52)
-    time.sleep(0.5)
+    # 7) Drop down
+    if not move_wait(BUCKET_X, BUCKET_Y, DROP_Z, "⬇️ DROP DOWN"):
+        print("⚠️ Bucket drop unreachable — releasing for safety")
+        gripper.open_gripper()
+        time.sleep(RELEASE_SETTLE)
+        return False
 
-    ik.move_to(BUCKET_X, BUCKET_Y, DROP_Z)
-    time.sleep(0.5)
-
-    print(f"⬇️ DROP DOWN    •  z={DROP_Z:.1f}")
-    print("🖐️ RELEASE      •  opening gripper")
-
+    # 8) Release
+    print("🖐️ RELEASE      • opening gripper")
     gripper.open_gripper()
-    time.sleep(0.5)
+    time.sleep(RELEASE_SETTLE)
 
+    # 9) Lift off bucket (not critical to guard, but nice)
     ik.move_to(BUCKET_X, BUCKET_Y, APPROACH_Z)
-    time.sleep(0.5)
+    time.sleep(MOVE_TIME + SETTLE_TIME)
 
-def scan_once():
-    camera.scan_position()
-    time.sleep(0.6)  # let arm + camera settle before snapshot
-
-    frame = take_snapshot()
-    bricks = detect_bricks(frame)
-
-    print("\n" + "="*52)
-    print(f"📷 Scan complete: {len(bricks)} brick(s) detected")
-    for i, b in enumerate(bricks, 1):
-        print(f"  [{i}] x={b['x']:.1f}, y={b['y']:.1f}, angle={b['angle']:.1f}, color={b['color']}")
-    print("="*52)
-
-    return bricks
-
-def choose_brick(bricks):
-    # Pick the closest brick to the robot origin (usually safest/reachable)
-    return min(bricks, key=lambda b: (b["x"]**2 + b["y"]**2))
+    return True
 
 
+# =========================
+# MAIN LOOP (RESCAN EACH PICK)
+# =========================
 def main():
     picked = 0
-    MAX_PICKS = 50  # safety limit so it doesn't run forever
 
     while picked < MAX_PICKS:
         bricks = scan_once()
 
         if not bricks:
-            print("\n✅ No bricks detected. Done.")
+            stage("✅ DONE", "• No bricks detected")
             break
 
         brick = choose_brick(bricks)
-        print(f"\n🎯 Selected brick: x={brick['x']:.1f}, y={brick['y']:.1f}, angle={brick['angle']:.1f}, color={brick['color']}")
 
-        pick_and_drop(brick)
-        picked += 1
+        ok = pick_and_drop(brick)
+        if ok:
+            picked += 1
+            print(f"✅ Picked count: {picked}")
+        else:
+            print("⏭ No pick this cycle (rescan next)")
 
-    print(f"\n🏁 Finished. Picked {picked} brick(s).")
+    stage("🏁 FINISHED", f"• Total picked: {picked}")
 
 
 if __name__ == "__main__":
