@@ -94,8 +94,8 @@ class JetArmIK:
 class JetArmGripper:
     def __init__(self):
         self.Arm = Arm
-        self.openGripperPulse = 0
-        self.closeGripperPulse = 1000
+        self.openGripperPulse = 150
+        self.closeGripperPulse = 850
         self.BASE_ZERO_OFFSET = 125.0
         self.DEG_PER_PULSE = 0.24
 
