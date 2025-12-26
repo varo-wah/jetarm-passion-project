@@ -39,23 +39,39 @@ def pixel_to_robot(u, v):
 # Color detection
 # =====================================================
 
+# [42] Replace detect_color() with this 4-bucket version
 def detect_color(frame, x, y, w, h):
     roi = frame[y:y+h, x:x+w]
     if roi.size == 0:
         return "unknown"
 
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-    avg_h = np.mean(hsv[:, :, 0])
-    avg_s = np.mean(hsv[:, :, 1])
+    H = hsv[:, :, 0]
+    S = hsv[:, :, 1]
+    V = hsv[:, :, 2]
 
-    if 140 <= avg_h <= 170 and avg_s > 80:
-        return "pink"
-    if 20 <= avg_h <= 35 and avg_s > 80:
-        return "yellow"
-    if 85 <= avg_h <= 105 and avg_s > 80:
-        return "cyan"
+    # Filter out background/shadow pixels
+    good = (S > 50) & (V > 50)
+    good_count = int(good.sum())
+    if good_count < 30:
+        # Too little signal → treat as neutral/unknown
+        return "neutral"
 
-    return "unknown"
+    H_good = H[good].astype(np.uint8)
+
+    # Dominant hue via histogram peak (0..179)
+    hist = cv2.calcHist([H_good], [0], None, [180], [0, 180])
+    h_peak = int(np.argmax(hist))
+
+    # 4-bucket mapping (covers ALL hues)
+    # Note: red wraps around 0 and 179, so include both ends in WARM
+    if h_peak < 35 or h_peak >= 170:
+        return "WARM"      # red/orange/yellow family (broad)
+    if 35 <= h_peak < 85:
+        return "GREEN"
+    if 85 <= h_peak < 130:
+        return "BLUE"      # cyan/blue
+    return "PURPLE"        # purple/pink
 
 # =====================================================
 # SNAPSHOT brick detection (FOR AUTOMATION)
