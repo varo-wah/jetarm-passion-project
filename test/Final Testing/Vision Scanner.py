@@ -24,7 +24,9 @@ def pick_and_drop(brick):
     angle = brick["angle"]
 
     # Approach
-    ik.move_to(x, y, APPROACH_Z)
+    if not ik.move_to(x, y, APPROACH_Z):
+        print("⏭ Skipping target (unreachable)")
+        return
     print("\n" + "-"*52)
     print(f"🚀 APPROACHING  •  x={x:.1f}  y={y:.1f}  z={APPROACH_Z:.1f}")
     print("   • Moving to safe height above the brick")
@@ -38,7 +40,9 @@ def pick_and_drop(brick):
     time.sleep(0.5)
 
     # Pick
-    ik.move_to(x, y, PICK_Z)
+    if not ik.move_to(x, y, PICK_Z):
+        print("⏭ Skipping target (unreachable)")
+        return
     print("\n" + "-"*52)
     print(f"⬇️ GOING DOWN   •  x={x:.1f}  y={y:.1f}  z={PICK_Z:.1f}")
     print("   • Descending to grasp height")
@@ -53,7 +57,9 @@ def pick_and_drop(brick):
 
     time.sleep(2)
 
-    ik.move_to(x, y, APPROACH_Z)
+    if not ik.move_to(x, y, APPROACH_Z):
+        print("⏭ Skipping target (unreachable)")
+        return
     print("\n" + "-"*52)
     print(f"⬆️ LIFTING UP   •  x={x:.1f}  y={y:.1f}  z={APPROACH_Z:.1f}")
     print("   • Lifting brick to safe travel height")
@@ -84,21 +90,45 @@ def pick_and_drop(brick):
     ik.move_to(BUCKET_X, BUCKET_Y, APPROACH_Z)
     time.sleep(0.5)
 
-def main():
-    # 1) Scan position
+def scan_once():
     camera.scan_position()
+    time.sleep(0.6)  # let arm + camera settle before snapshot
 
-    # 2) Snapshot
     frame = take_snapshot()
-
-    # 3) Detect bricks
     bricks = detect_bricks(frame)
-    print(f"Detected {len(bricks)} bricks:", bricks)
 
-    # 4) Pick all → same bucket
-    for brick in bricks:
-        print(f"Moving to brick: {brick}")
+    print("\n" + "="*52)
+    print(f"📷 Scan complete: {len(bricks)} brick(s) detected")
+    for i, b in enumerate(bricks, 1):
+        print(f"  [{i}] x={b['x']:.1f}, y={b['y']:.1f}, angle={b['angle']:.1f}, color={b['color']}")
+    print("="*52)
+
+    return bricks
+
+def choose_brick(bricks):
+    # Pick the closest brick to the robot origin (usually safest/reachable)
+    return min(bricks, key=lambda b: (b["x"]**2 + b["y"]**2))
+
+
+def main():
+    picked = 0
+    MAX_PICKS = 50  # safety limit so it doesn't run forever
+
+    while picked < MAX_PICKS:
+        bricks = scan_once()
+
+        if not bricks:
+            print("\n✅ No bricks detected. Done.")
+            break
+
+        brick = choose_brick(bricks)
+        print(f"\n🎯 Selected brick: x={brick['x']:.1f}, y={brick['y']:.1f}, angle={brick['angle']:.1f}, color={brick['color']}")
+
         pick_and_drop(brick)
+        picked += 1
+
+    print(f"\n🏁 Finished. Picked {picked} brick(s).")
+
 
 if __name__ == "__main__":
     main()

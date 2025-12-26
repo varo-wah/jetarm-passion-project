@@ -54,18 +54,42 @@ class JetArmIK:
         return base_angle, L1_angle, L2_angle, L3_angle
 
     def move_to(self, x, y, z):
-        base_angle, L1_angle, L2_angle, L3_angle = self.calculate_angles(x, y, z)
+        try:
+            base_angle, L1_angle, L2_angle, L3_angle = self.calculate_angles(x, y, z)
+        except ValueError as e:
+            print(f"❌ IK math failed for x={x:.1f}, y={y:.1f}, z={z:.1f}  ({e})")
+            return False
 
         base_pulse = self.base_to_pulse(base_angle)
         L1_pulse = self.arm_to_pulse(L1_angle)
         L2_pulse = self.arm_to_pulse(L2_angle)
         L3_pulse = self.arm_to_pulse(L3_angle) + 35
-        
-        print(f"Moving to: {base_pulse}, {L1_pulse}, {L2_pulse}, {L3_pulse}")
-        self.Arm.moveJetArm(1, base_pulse)
-        self.Arm.moveJetArm(2, L1_pulse)
-        self.Arm.moveJetArm(3, L2_pulse)
-        self.Arm.moveJetArm(4, L3_pulse)
+
+        # Servo safety limits (adjust max if your servos use a different range)
+        pulses = {
+            "base": base_pulse,
+            "L1": L1_pulse,
+            "L2": L2_pulse,
+            "L3": L3_pulse
+        }
+
+        for name, p in pulses.items():
+            if not isinstance(p, int):
+                p_int = int(round(p))
+                pulses[name] = p_int
+                p = p_int
+
+            # Your system seems to use ~0–1000 for positions. If yours differs, change these.
+            if p < 0 or p > 1000:
+                print(f"❌ Joint limit: {name} pulse={p} (x={x:.1f}, y={y:.1f}, z={z:.1f})")
+                return False
+
+        print(f"Moving to: {pulses['base']}, {pulses['L1']}, {pulses['L2']}, {pulses['L3']}")
+        self.Arm.moveJetArm(1, pulses["base"])
+        self.Arm.moveJetArm(2, pulses["L1"])
+        self.Arm.moveJetArm(3, pulses["L2"])
+        self.Arm.moveJetArm(4, pulses["L3"])
+        return True
 
 class JetArmGripper:
     def __init__(self):
