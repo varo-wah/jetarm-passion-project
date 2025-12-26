@@ -1,13 +1,14 @@
 # viewer.py
 import cv2
 import numpy as np
-from coordinates import pixel_to_robot, detect_color
+from coordinatelogic import pixel_to_robot, detect_color
 
 # =====================================================
 # Smoothing (DISPLAY ONLY)
 # =====================================================
 X_history = []
 Y_history = []
+angle_history = []
 SMOOTH_N = 5
 
 def smooth(val, history):
@@ -52,6 +53,10 @@ while True:
         if h > w:
             angle += 90
         angle = angle % 180
+
+        angle_raw = angle
+
+        angle = smooth(angle_raw, angle_history)
 
         box = cv2.boxPoints(rect)
         box = np.int32(box)
