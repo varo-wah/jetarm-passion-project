@@ -43,35 +43,50 @@ def pixel_to_robot(u, v):
 def detect_color(frame, x, y, w, h):
     roi = frame[y:y+h, x:x+w]
     if roi.size == 0:
-        return "unknown"
+        return "NEUTRAL"
+
+    # 1) Software brightness/contrast boost (helps dark bricks)
+    #    alpha = contrast, beta = brightness
+    roi = cv2.convertScaleAbs(roi, alpha=1.25, beta=25)
 
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     H = hsv[:, :, 0]
     S = hsv[:, :, 1]
     V = hsv[:, :, 2]
 
-    # Filter out background/shadow pixels
-    good = (S > 50) & (V > 50)
+    # 2) Adaptive "good pixel" thresholding for darker lighting
+    #    Instead of fixed V>40, set V threshold relative to this ROI.
+    v_med = float(np.median(V))
+    s_med = float(np.median(S))
+
+    S_TH = 20                      # allow less-saturated pixels (dark scenes)
+    V_TH = max(20, v_med * 0.55)   # dynamic; clamps so it never goes too low
+
+    good = (S > S_TH) & (V > V_TH)
     good_count = int(good.sum())
-    if good_count < 30:
-        # Too little signal → treat as neutral/unknown
-        return "neutral"
+    total = int(H.size)
+    good_ratio = good_count / max(1, total)
+
+    # 3) If almost no pixels look like real color, call it neutral
+    #    Lowered slightly so dark-but-colored bricks don't get rejected.
+    if good_ratio < 0.06:          # tune 0.04–0.12
+        return "NEUTRAL"
 
     H_good = H[good].astype(np.uint8)
 
-    # Dominant hue via histogram peak (0..179)
+    # 4) Dominant hue (histogram peak)
     hist = cv2.calcHist([H_good], [0], None, [180], [0, 180])
     h_peak = int(np.argmax(hist))
 
-    # 4-bucket mapping (covers ALL hues)
-    # Note: red wraps around 0 and 179, so include both ends in WARM
-    if h_peak < 35 or h_peak >= 170:
-        return "WARM"      # red/orange/yellow family (broad)
-    if 35 <= h_peak < 85:
-        return "GREEN"
-    if 85 <= h_peak < 130:
-        return "BLUE"      # cyan/blue
-    return "PURPLE"        # purple/pink
+    # 5) Nearest parent hue (RED/GREEN/BLUE)
+    parents = {"RED": 0, "GREEN": 60, "BLUE": 120}
+
+    def hue_dist(a, b):
+        d = abs(a - b)
+        return min(d, 180 - d)
+
+    return min(parents, key=lambda k: hue_dist(h_peak, parents[k]))
+
 
 # =====================================================
 # SNAPSHOT brick detection (FOR AUTOMATION)
