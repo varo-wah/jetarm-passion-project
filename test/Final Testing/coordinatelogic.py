@@ -45,40 +45,28 @@ def detect_color(frame, x, y, w, h):
     if roi.size == 0:
         return "NEUTRAL"
 
-    # 1) Software brightness/contrast boost (helps dark bricks)
-    #    alpha = contrast, beta = brightness
-    roi = cv2.convertScaleAbs(roi, alpha=1.25, beta=25)
-
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     H = hsv[:, :, 0]
     S = hsv[:, :, 1]
     V = hsv[:, :, 2]
 
-    # 2) Adaptive "good pixel" thresholding for darker lighting
-    #    Instead of fixed V>40, set V threshold relative to this ROI.
-    v_med = float(np.median(V))
-    s_med = float(np.median(S))
-
-    S_TH = 20                      # allow less-saturated pixels (dark scenes)
-    V_TH = max(20, v_med * 0.55)   # dynamic; clamps so it never goes too low
-
-    good = (S > S_TH) & (V > V_TH)
+    # 1) Build a "color pixel" mask (lower thresholds first; tune later)
+    good = (S > 25) & (V > 40)
     good_count = int(good.sum())
     total = int(H.size)
     good_ratio = good_count / max(1, total)
 
-    # 3) If almost no pixels look like real color, call it neutral
-    #    Lowered slightly so dark-but-colored bricks don't get rejected.
-    if good_ratio < 0.06:          # tune 0.04–0.12
+    # If almost no pixels look like real color, call it NEUTRAL
+    if good_ratio < 0.08:   # tune 0.05–0.15
         return "NEUTRAL"
 
     H_good = H[good].astype(np.uint8)
 
-    # 4) Dominant hue (histogram peak)
+    # 2) Dominant hue
     hist = cv2.calcHist([H_good], [0], None, [180], [0, 180])
     h_peak = int(np.argmax(hist))
 
-    # 5) Nearest parent hue (RED/GREEN/BLUE)
+    # 3) Nearest parent hue (RED/GREEN/BLUE)
     parents = {"RED": 0, "GREEN": 60, "BLUE": 120}
 
     def hue_dist(a, b):
@@ -128,7 +116,8 @@ def detect_bricks(frame):
         x, y, bw, bh = cv2.boundingRect(c)
 
         # Shrink ROI to reduce background/edges
-        pad = max(2, int(min(bw, bh) * 0.12))  # tune 0.08–0.18
+        pad = int(min(bw, bh) * 0.08)
+        pad = max(2, min(pad, 6))   # cap at 6px
         x2 = x + pad
         y2 = y + pad
         bw2 = max(1, bw - 2 * pad)
