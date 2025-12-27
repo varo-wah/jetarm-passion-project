@@ -111,7 +111,15 @@ def detect_bricks(frame):
         angle = angle % 180
 
         x, y, bw, bh = cv2.boundingRect(c)
-        color = detect_color(frame, x, y, bw, bh)
+
+        # Shrink ROI to reduce background/edges
+        pad = max(2, int(min(bw, bh) * 0.12))  # tune 0.08–0.18
+        x2 = x + pad
+        y2 = y + pad
+        bw2 = max(1, bw - 2 * pad)
+        bh2 = max(1, bh - 2 * pad)
+
+        color = detect_color(frame, x2, y2, bw2, bh2)
 
         Xr, Yr = pixel_to_robot(cx, cy)
 
