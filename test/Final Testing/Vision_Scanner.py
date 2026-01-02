@@ -11,12 +11,13 @@ from Class_Execution import ik, gripper, camera
 # =========================
 # SETTINGS (EDIT THESE)
 # =========================
-NEUTRAL_BUCKET_X, NEUTRAL_BUCKET_Y = 15, 0
-RED_BUCKET_X, RED_BUCKET_Y = 15, 0
-BLUE_BUCKET_X, BLUE_BUCKET_Y = -15, 0
-GREEN_BUCKET_X, GREEN_BUCKET_Y = -15, 0
-APPROACH_Z = 12
-PICK_Z = 10.25
+NEUTRAL_BUCKET_X, NEUTRAL_BUCKET_Y = 20, 0
+RED_BUCKET_X, RED_BUCKET_Y = 20, -10
+BLUE_BUCKET_X, BLUE_BUCKET_Y = -20, -10
+GREEN_BUCKET_X, GREEN_BUCKET_Y = -20, 0
+APPROACH_Z = 15
+APPROACH_BUCKET = 18
+PICK_Z = 10
 DROP_Z = 15
 
 MAX_PICKS = 50
@@ -160,8 +161,12 @@ def pick_and_drop(brick):
         time.sleep(RELEASE_SETTLE)
         return False
 
+    # EXTRA) GO TO SCAN POSITION
+    ik.move_to(0, 15, 23)
+    time.sleep(GRIP_SETTLE)
+
     # 7) Move to bucket (approach)
-    if not move_wait(bx, by, APPROACH_Z, f"🪣 TO {brick.get('color', 'NEUTRAL')} BUCKET"):
+    if not move_wait(bx, by, APPROACH_BUCKET, f"🪣 TO {brick.get('color', 'NEUTRAL')} BUCKET"):
         print("⚠️ Bucket approach unreachable — releasing for safety")
         gripper.open_gripper()
         time.sleep(RELEASE_SETTLE)
