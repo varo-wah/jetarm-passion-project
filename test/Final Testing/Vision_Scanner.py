@@ -1,4 +1,4 @@
-# Vision Scanner.py
+# Vision_Scanner.py
 # ------------------------------------------------------------
 # Scan → pick 1 → drop → rescan (repeat)
 # ------------------------------------------------------------
@@ -11,8 +11,11 @@ from Class_Execution import ik, gripper, camera
 # =========================
 # SETTINGS (EDIT THESE)
 # =========================
-BUCKET_X, BUCKET_Y = 15, 0
-APPROACH_Z = 15
+NEUTRAL_BUCKET_X, NEUTRAL_BUCKET_Y = 15, 0
+RED_BUCKET_X, RED_BUCKET_Y = 15, 0
+BLUE_BUCKET_X, BLUE_BUCKET_Y = -15, 0
+GREEN_BUCKET_X, GREEN_BUCKET_Y = -15, 0
+APPROACH_Z = 12
 PICK_Z = 10.25
 DROP_Z = 15
 
@@ -72,6 +75,23 @@ def take_snapshot():
 
 
 # =========================
+# COLOR DETECTION
+# =========================
+def bucket_for_color(color):
+    color = (color or "NEUTRAL").upper()
+
+    if color == "RED":
+        return RED_BUCKET_X, RED_BUCKET_Y
+    if color == "GREEN":
+        return GREEN_BUCKET_X, GREEN_BUCKET_Y
+    if color == "BLUE":
+        return BLUE_BUCKET_X, BLUE_BUCKET_Y
+
+    # fallback
+    return NEUTRAL_BUCKET_X, NEUTRAL_BUCKET_Y
+
+
+# =========================
 # MOTION WRAPPER
 # =========================
 def move_wait(x, y, z, label):
@@ -110,6 +130,7 @@ def pick_and_drop(brick):
     x = brick["x"]
     y = brick["y"]
     angle = brick["angle"]
+    bx, by = bucket_for_color(brick.get("color"))
 
     stage("🎯 SELECTED BRICK",
           f"• x={x:.2f}, y={y:.2f}, angle={angle:.1f}, color={brick['color']}")
@@ -139,27 +160,26 @@ def pick_and_drop(brick):
         time.sleep(RELEASE_SETTLE)
         return False
 
-    # 6) Move to bucket (approach)
-    if not move_wait(BUCKET_X, BUCKET_Y, APPROACH_Z, "🪣 TO BUCKET"):
+    # 7) Move to bucket (approach)
+    if not move_wait(bx, by, APPROACH_Z, f"🪣 TO {brick.get('color', 'NEUTRAL')} BUCKET"):
         print("⚠️ Bucket approach unreachable — releasing for safety")
         gripper.open_gripper()
         time.sleep(RELEASE_SETTLE)
         return False
 
-    # 7) Drop down
-    if not move_wait(BUCKET_X, BUCKET_Y, DROP_Z, "⬇️ DROP DOWN"):
+    # 8) Drop down
+    if not move_wait(bx, by, DROP_Z, "⬇️ DROP DOWN"):
         print("⚠️ Bucket drop unreachable — releasing for safety")
         gripper.open_gripper()
         time.sleep(RELEASE_SETTLE)
         return False
 
-    # 8) Release
+    # 9) Release + lift off
     print("🖐️ RELEASE      • opening gripper")
     gripper.open_gripper()
     time.sleep(RELEASE_SETTLE)
 
-    # 9) Lift off bucket (not critical to guard, but nice)
-    ik.move_to(BUCKET_X, BUCKET_Y, APPROACH_Z)
+    ik.move_to(bx, by, APPROACH_Z)
     time.sleep(MOVE_TIME + SETTLE_TIME)
 
     return True
