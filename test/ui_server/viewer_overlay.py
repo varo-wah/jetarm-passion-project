@@ -1,7 +1,8 @@
 # ui_server/viewer_overlay.py
 import cv2
 import numpy as np
-from coordinatelogic import pixel_to_robot, detect_color
+from final_testing.coordinatelogic import pixel_to_robot, detect_color
+
 
 # =====================================================
 # Smoothing (DISPLAY ONLY)
