@@ -7,6 +7,8 @@ import cv2
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from ui_server.viewer_overlay import annotate_frame
+
 
 from ui_server.camera_worker import start_camera, get_latest_frame_copy
 
@@ -43,15 +45,14 @@ def mjpeg_generator() -> Generator[bytes, None, None]:
             continue
 
         ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+        frame = annotate_frame(frame)
         if not ok:
             time.sleep(0.02)
             continue
-
         yield boundary + b"\r\n"
         yield b"Content-Type: image/jpeg\r\n"
         yield b"Content-Length: " + str(len(jpg)).encode("ascii") + b"\r\n\r\n"
         yield jpg.tobytes() + b"\r\n"
-
 
 @app.get("/video")
 def video() -> StreamingResponse:
