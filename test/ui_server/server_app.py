@@ -44,11 +44,19 @@ def mjpeg_generator() -> Generator[bytes, None, None]:
             time.sleep(0.05)
             continue
 
+        # Apply overlay BEFORE encoding (and don't let overlay crash the stream)
+        try:
+            frame = annotate_frame(frame)
+        except Exception as e:
+            # Optional: you can print once or log; for now keep stream alive
+            # print(f"annotate_frame error: {e}")
+            pass
+
         ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-        frame = annotate_frame(frame)
         if not ok:
             time.sleep(0.02)
             continue
+
         yield boundary + b"\r\n"
         yield b"Content-Type: image/jpeg\r\n"
         yield b"Content-Length: " + str(len(jpg)).encode("ascii") + b"\r\n\r\n"
