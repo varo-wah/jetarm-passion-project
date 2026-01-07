@@ -21,6 +21,7 @@ class JetArmIK:
         self.BASE_ZERO_OFFSET = 125.0
         self.ANGLE_ZERO_OFFSET = 125.0
         self.ELBOW_UP = True
+        self.last_base_angle = 0.0
 
     def base_to_pulse(self, angle_deg):
         return int(round(angle_deg / self.DEG_PER_PULSE + self.BASE_ZERO_OFFSET))
@@ -29,7 +30,22 @@ class JetArmIK:
         return int(round(arm_deg / self.DEG_PER_PULSE + self.ANGLE_ZERO_OFFSET))
 
     def calculate_angles(self, x, y, z):
+        # 1) Base angle from atan2 in [-180, 180]
         base_angle = math.degrees(math.atan2(y, x))
+
+        # 2) Seam-fix ONLY at the -180/+180 wrap (prevents x<0 flipping to negative)
+        #    Keeps small negatives (e.g., x>0,y<0) as small negatives (so no 360° jump).
+        if hasattr(self, "last_base_angle"):
+            prev = self.last_base_angle
+            if prev - base_angle > 180.0:
+                base_angle += 360.0
+            elif base_angle - prev > 180.0:
+                base_angle -= 360.0
+
+        # 3) Store for wrist alignment + continuity next call
+        self.last_base_angle = base_angle
+
+        # --- Your existing planar IK math (unchanged) ---
         l = math.hypot(x, y)
         d = math.hypot(l, z)
         h = d / 2
@@ -48,8 +64,6 @@ class JetArmIK:
             L2_angle = 360 - (intersection + 90)
 
         L3_angle = 90 - (L2_angle + L1_angle)
-        
-        self.last_base_angle = base_angle
 
         return base_angle, L1_angle, L2_angle, L3_angle
 
@@ -65,25 +79,16 @@ class JetArmIK:
         L2_pulse = self.arm_to_pulse(L2_angle)
         L3_pulse = self.arm_to_pulse(L3_angle) + 35
 
-        # Servo safety limits (adjust max if your servos use a different range)
-        pulses = {
-            "base": base_pulse,
-            "L1": L1_pulse,
-            "L2": L2_pulse,
-            "L3": L3_pulse
-        }
+        pulses = {"base": base_pulse, "L1": L1_pulse, "L2": L2_pulse, "L3": L3_pulse}
 
         for name, p in pulses.items():
             if not isinstance(p, int):
-                p_int = int(round(p))
-                pulses[name] = p_int
-                p = p_int
-
-            # Your system seems to use ~0–1000 for positions. If yours differs, change these.
+                p = int(round(p))
+                pulses[name] = p
             if p < 0 or p > 1000:
                 print(f"❌ Joint limit: {name} pulse={p} (x={x:.1f}, y={y:.1f}, z={z:.1f})")
                 return False
-
+                
         print(f"Moving to: {pulses['base']}, {pulses['L1']}, {pulses['L2']}, {pulses['L3']}")
         self.Arm.moveJetArm(1, pulses["base"])
         self.Arm.moveJetArm(2, pulses["L1"])

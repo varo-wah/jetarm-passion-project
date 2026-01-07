@@ -11,12 +11,12 @@ from Class_Execution import ik, gripper, camera
 # =========================
 # SETTINGS (EDIT THESE)
 # =========================
-NEUTRAL_BUCKET_X, NEUTRAL_BUCKET_Y = 20, 0
-RED_BUCKET_X, RED_BUCKET_Y = 20, -10
-BLUE_BUCKET_X, BLUE_BUCKET_Y = -20, -10
+NEUTRAL_BUCKET_X, NEUTRAL_BUCKET_Y = 20, -7
+RED_BUCKET_X, RED_BUCKET_Y = -20, -7
+BLUE_BUCKET_X, BLUE_BUCKET_Y = 20, 0
 GREEN_BUCKET_X, GREEN_BUCKET_Y = -20, 0
 APPROACH_Z = 15
-APPROACH_BUCKET = 18
+APPROACH_BUCKET = 20
 PICK_Z = 10
 DROP_Z = 15
 
@@ -172,19 +172,12 @@ def pick_and_drop(brick):
         time.sleep(RELEASE_SETTLE)
         return False
 
-    # 8) Drop down
-    if not move_wait(bx, by, DROP_Z, "⬇️ DROP DOWN"):
-        print("⚠️ Bucket drop unreachable — releasing for safety")
-        gripper.open_gripper()
-        time.sleep(RELEASE_SETTLE)
-        return False
-
     # 9) Release + lift off
     print("🖐️ RELEASE      • opening gripper")
     gripper.open_gripper()
     time.sleep(RELEASE_SETTLE)
 
-    ik.move_to(bx, by, APPROACH_Z)
+    ik.move_to(bx, by, APPROACH_BUCKET)
     time.sleep(MOVE_TIME + SETTLE_TIME)
 
     return True
