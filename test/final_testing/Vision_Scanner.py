@@ -7,6 +7,12 @@ import cv2
 import time
 from coordinatelogic import detect_bricks
 from Class_Execution import ik, gripper, camera
+import os
+import numpy as np
+import requests
+
+UI_SERVER = os.environ.get("UI_SERVER", "http://127.0.0.1:8000")
+FRAME_URL = f"{UI_SERVER}/api/frame.jpg"
 
 # =========================
 # SETTINGS (EDIT THESE)
@@ -60,9 +66,24 @@ def print_bricks(bricks):
 # CAMERA
 # =========================
 def take_snapshot():
-    cap = cv2.VideoCapture(CAM_INDEX)
+    """
+    If UI server is running, fetch latest frame from it.
+    Falls back to direct camera capture if UI is not reachable.
+    """
+    # 1) Try UI server first (preferred)
+    try:
+        r = requests.get(FRAME_URL, timeout=1.0)
+        if r.status_code == 200:
+            data = np.frombuffer(r.content, dtype=np.uint8)
+            frame = cv2.imdecode(data, cv2.IMREAD_COLOR)
+            if frame is None:
+                raise RuntimeError("UI returned invalid JPEG")
+            return frame
+    except Exception:
+        pass  # fallback below
 
-    # Warm up exposure/autofocus
+    # 2) Fallback: direct camera (use only if UI is off)
+    cap = cv2.VideoCapture(CAM_INDEX)
     for _ in range(WARMUP_FRAMES):
         cap.read()
 

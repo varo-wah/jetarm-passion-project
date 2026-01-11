@@ -1,14 +1,436 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>JetArm UI</title>
+    <title>JetArm Control Panel</title>
+
     <style>
-      body { margin: 0; font-family: system-ui, sans-serif; }
-      img { width: 100vw; height: auto; display: block; }
+      :root{
+        --bg:#0b0f16;
+        --panel:#121a26;
+        --panel2:#0f1622;
+        --text:#d7e2f0;
+        --muted:#8ea2bd;
+        --line:#233247;
+
+        --good:#1ed760;
+        --warn:#f5c542;
+        --bad:#ff4d4d;
+
+        --btn:#1b2636;
+        --btn2:#223149;
+        --accent:#49b6ff;
+
+        --radius:16px;
+      }
+
+      *{box-sizing:border-box}
+      body{
+        margin:0;
+        background: radial-gradient(1200px 600px at 20% 0%, #12223a 0%, var(--bg) 55%) fixed;
+        color:var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        line-height:1.35;
+      }
+
+      .topbar{
+        position:sticky; top:0; z-index:10;
+        background: rgba(11,15,22,0.85);
+        backdrop-filter: blur(10px);
+        border-bottom:1px solid rgba(35,50,71,0.7);
+      }
+      .topbar-inner{
+        max-width:1200px;
+        margin:0 auto;
+        padding:12px 14px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+      }
+      .brand{
+        display:flex; align-items:center; gap:10px;
+        font-weight:700;
+        letter-spacing:0.4px;
+      }
+      .dot{
+        width:10px; height:10px; border-radius:50%;
+        background: var(--warn);
+        box-shadow: 0 0 10px rgba(245,197,66,0.55);
+      }
+      .pill{
+        display:flex; align-items:center; gap:8px;
+        padding:8px 10px;
+        border:1px solid rgba(35,50,71,0.9);
+        background: rgba(18,26,38,0.7);
+        border-radius:999px;
+        color:var(--muted);
+        font-size:12px;
+        white-space:nowrap;
+      }
+      .pill b{color:var(--text); font-weight:600}
+
+      .wrap{
+        max-width:1200px;
+        margin:0 auto;
+        padding:14px;
+      }
+
+      .grid{
+        display:grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap:14px;
+      }
+
+      @media (max-width: 900px){
+        .grid{ grid-template-columns: 1fr; }
+      }
+
+      .card{
+        background: rgba(18,26,38,0.75);
+        border:1px solid rgba(35,50,71,0.9);
+        border-radius: var(--radius);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        overflow:hidden;
+      }
+
+      .card-h{
+        padding:12px 12px 10px;
+        display:flex; align-items:center; justify-content:space-between;
+        border-bottom:1px solid rgba(35,50,71,0.7);
+        background: rgba(15,22,34,0.55);
+      }
+      .card-h .title{
+        font-size:13px;
+        color:var(--muted);
+        letter-spacing:0.3px;
+        text-transform:uppercase;
+      }
+
+      /* Video */
+      .video-shell{
+        padding:12px;
+      }
+      .video-frame{
+        width:100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 14px;
+        border:1px solid rgba(35,50,71,0.85);
+        background: #05070b;
+        overflow:hidden;
+        position:relative;
+      }
+      .video-frame img{
+        width:100%;
+        height:100%;
+        object-fit:contain; /* prevents stretching */
+        display:block;
+      }
+      .video-overlay{
+        position:absolute;
+        left:10px; bottom:10px;
+        display:flex; gap:8px; flex-wrap:wrap;
+      }
+      .tag{
+        font-size:12px;
+        padding:6px 8px;
+        border-radius:999px;
+        border:1px solid rgba(35,50,71,0.85);
+        background: rgba(10,14,20,0.55);
+        color: var(--muted);
+      }
+      .tag b{ color: var(--text); font-weight:600; }
+
+      /* Controls */
+      .controls{
+        padding:12px;
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+      }
+
+      .row{
+        display:flex;
+        gap:10px;
+        flex-wrap:wrap;
+      }
+
+      .btn{
+        appearance:none;
+        border:none;
+        border-radius: 14px;
+        padding:12px 12px;
+        background: linear-gradient(180deg, var(--btn2), var(--btn));
+        color: var(--text);
+        font-weight:650;
+        letter-spacing:0.2px;
+        cursor:pointer;
+        border:1px solid rgba(35,50,71,0.9);
+        min-width: 120px;
+        flex:1 1 120px;
+      }
+      .btn:hover{ filter: brightness(1.05); }
+      .btn:active{ transform: translateY(1px); }
+      .btn:disabled{
+        opacity:0.5;
+        cursor:not-allowed;
+        transform:none;
+      }
+
+      .btn-primary{
+        border-color: rgba(73,182,255,0.55);
+        box-shadow: 0 0 0 1px rgba(73,182,255,0.15) inset;
+      }
+      .btn-danger{
+        border-color: rgba(255,77,77,0.55);
+        box-shadow: 0 0 0 1px rgba(255,77,77,0.15) inset;
+      }
+
+      .panel{
+        background: rgba(15,22,34,0.55);
+        border:1px solid rgba(35,50,71,0.85);
+        border-radius: 14px;
+        padding:12px;
+      }
+
+      .kv{
+        display:grid;
+        grid-template-columns: 110px 1fr;
+        gap:8px 10px;
+        font-size:13px;
+        color:var(--muted);
+      }
+      .kv .k{ color: var(--muted); }
+      .kv .v{ color: var(--text); font-weight:600; }
+
+      .inputs{
+        display:grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap:10px;
+      }
+      @media (max-width: 900px){
+        .inputs{ grid-template-columns: 1fr; }
+      }
+      .field label{
+        display:block;
+        font-size:12px;
+        color: var(--muted);
+        margin-bottom:6px;
+      }
+      .field input{
+        width:100%;
+        padding:12px 12px;
+        border-radius: 12px;
+        border:1px solid rgba(35,50,71,0.9);
+        background: rgba(9,12,18,0.7);
+        color: var(--text);
+        outline:none;
+        font-size:14px;
+      }
+      .field input:focus{
+        border-color: rgba(73,182,255,0.55);
+        box-shadow: 0 0 0 3px rgba(73,182,255,0.12);
+      }
+
+      .hint{
+        margin-top:8px;
+        font-size:12px;
+        color: var(--muted);
+      }
+
+      .danger-zone{
+        border-color: rgba(255,77,77,0.4);
+        background: rgba(40,12,12,0.25);
+      }
+
+      .tiny{
+        font-size:12px; color:var(--muted);
+      }
     </style>
   </head>
+
   <body>
-    <img src="/video" />
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="dot" id="connDot"></div>
+          <div>JetArm Control Panel</div>
+        </div>
+        <div class="pill">
+          <span>State:</span>
+          <b id="stateText">UNKNOWN</b>
+          <span style="opacity:.55">|</span>
+          <span>FPS:</span>
+          <b id="fpsText">--</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <div class="grid">
+        <!-- LEFT: VIDEO -->
+        <div class="card">
+          <div class="card-h">
+            <div class="title">Live Camera</div>
+            <div class="tiny" id="videoMeta">/video</div>
+          </div>
+
+          <div class="video-shell">
+            <div class="video-frame">
+              <img id="videoEl" src="/video" alt="Live stream" />
+              <div class="video-overlay">
+                <div class="tag">Last action: <b id="lastActionText">--</b></div>
+                <div class="tag">Last detection: <b id="lastDetText">--</b></div>
+              </div>
+            </div>
+            <div class="hint">Tip: if stream freezes, refresh once. Persistent freezes usually mean the overlay crashed or camera is busy.</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: STATUS + CONTROLS -->
+        <div class="card">
+          <div class="card-h">
+            <div class="title">Controls</div>
+            <div class="tiny" id="serverTime">--</div>
+          </div>
+
+          <div class="controls">
+            <!-- Status panel -->
+            <div class="panel">
+              <div class="kv">
+                <div class="k">Connection</div><div class="v" id="connText">--</div>
+                <div class="k">Sort count</div><div class="v" id="countText">--</div>
+                <div class="k">Last error</div><div class="v" id="errText">--</div>
+              </div>
+            </div>
+
+            <!-- Main buttons -->
+            <div class="panel">
+              <div class="row">
+                <button class="btn btn-primary" id="btnPause">Pause</button>
+                <button class="btn btn-primary" id="btnResume">Resume</button>
+              </div>
+              <div class="row">
+                <button class="btn btn-danger" id="btnStop">Stop</button>
+                <button class="btn btn-danger" id="btnEstop">E-Stop</button>
+              </div>
+              <div class="hint">Stop/E-Stop should be treated as a safety-critical action. Your backend must enforce motor safety.</div>
+            </div>
+
+            <!-- Manual goto/jog -->
+            <div class="panel">
+              <div class="inputs">
+                <div class="field">
+                  <label for="xIn">X</label>
+                  <input id="xIn" inputmode="decimal" placeholder="e.g. 10.5" />
+                </div>
+                <div class="field">
+                  <label for="yIn">Y</label>
+                  <input id="yIn" inputmode="decimal" placeholder="e.g. 22.0" />
+                </div>
+                <div class="field">
+                  <label for="zIn">Z</label>
+                  <input id="zIn" inputmode="decimal" placeholder="e.g. 8.0" />
+                </div>
+              </div>
+
+              <div class="row" style="margin-top:10px">
+                <button class="btn btn-primary" id="btnGoto">Go To (X,Y,Z)</button>
+                <button class="btn" id="btnHome">Home</button>
+              </div>
+
+              <div class="hint">Coordinate commands should be validated server-side (limits, collisions, speed caps).</div>
+            </div>
+
+            <!-- Danger zone styling -->
+            <div class="panel danger-zone">
+              <div class="tiny">
+                Danger zone: E-Stop should cut motion immediately. Implement it as a high-priority state in the sorter process.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ---------- helpers ----------
+      const $ = (id) => document.getElementById(id);
+
+      function setConn(ok){
+        $("connDot").style.background = ok ? "var(--good)" : "var(--bad)";
+        $("connDot").style.boxShadow = ok
+          ? "0 0 10px rgba(30,215,96,0.55)"
+          : "0 0 10px rgba(255,77,77,0.55)";
+        $("connText").textContent = ok ? "ONLINE" : "OFFLINE";
+      }
+
+      async function postCmd(type, payload){
+        const body = { type, ...payload };
+        const res = await fetch("/api/cmd", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ("HTTP " + res.status));
+        }
+        return await res.json();
+      }
+
+      function numOrNull(v){
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      // ---------- button wiring ----------
+      $("btnPause").onclick  = async () => { try { await postCmd("pause", {}); } catch(e){ alert("Pause failed: " + e.message); } };
+      $("btnResume").onclick = async () => { try { await postCmd("resume", {}); } catch(e){ alert("Resume failed: " + e.message); } };
+      $("btnStop").onclick   = async () => {
+        if (!confirm("STOP the system?")) return;
+        try { await postCmd("stop", {}); } catch(e){ alert("Stop failed: " + e.message); }
+      };
+      $("btnEstop").onclick  = async () => {
+        if (!confirm("E-STOP NOW?")) return;
+        try { await postCmd("estop", {}); } catch(e){ alert("E-Stop failed: " + e.message); }
+      };
+
+      $("btnGoto").onclick = async () => {
+        const x = numOrNull($("xIn").value);
+        const y = numOrNull($("yIn").value);
+        const z = numOrNull($("zIn").value);
+        if (x === null || y === null || z === null) { alert("Enter valid X, Y, Z numbers."); return; }
+        try { await postCmd("goto", { x, y, z }); } catch(e){ alert("GoTo failed: " + e.message); }
+      };
+
+      $("btnHome").onclick = async () => { try { await postCmd("home", {}); } catch(e){ alert("Home failed: " + e.message); } };
+
+      // ---------- status polling ----------
+      async function refreshStatus(){
+        try{
+          const res = await fetch("/api/status", { cache: "no-store" });
+          if(!res.ok) throw new Error("HTTP " + res.status);
+          const s = await res.json();
+
+          setConn(true);
+
+          $("stateText").textContent = s.state ?? "UNKNOWN";
+          $("fpsText").textContent = (s.fps ?? "--");
+          $("lastActionText").textContent = s.last_action ?? "--";
+          $("lastDetText").textContent = s.last_detection ?? "--";
+          $("countText").textContent = (s.sort_count ?? "--");
+          $("errText").textContent = s.last_error ?? "--";
+          $("serverTime").textContent = s.server_time ?? "--";
+        }catch(e){
+          setConn(false);
+        }
+      }
+
+      // Start polling
+      refreshStatus();
+      setInterval(refreshStatus, 350);
+    </script>
   </body>
 </html>
