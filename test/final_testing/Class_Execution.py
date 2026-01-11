@@ -126,6 +126,19 @@ class ComputerVision:
         self.gripper.turn_wrist(90)
         self.gripper.open_gripper()
 
+class UserFriendlyMode:
+    def __init__(self, ik, gripper, camera):
+        self.ik = ik
+        self.gripper = gripper
+        self.camera = camera
+    def dummy_position(self):
+        self.Arm.moveJetArm(1, 500)
+        self.Arm.moveJetArm(2, 750)
+        self.Arm.moveJetArm(3, 350)
+        self.Arm.moveJetArm(4, 400) 
+        self.gripper.turn_wrist(90)
+        self.gripper.open_gripper()
+
 ik = JetArmIK()
 gripper = JetArmGripper()
 camera = ComputerVision(ik, gripper)

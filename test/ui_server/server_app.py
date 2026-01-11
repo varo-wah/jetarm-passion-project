@@ -13,6 +13,7 @@ from fastapi import Body
 from fastapi.responses import JSONResponse
 from datetime import datetime
 from fastapi.responses import Response
+from final_testing.Class_Execution import ik, gripper, camera
 
 
 
@@ -61,7 +62,7 @@ def mjpeg_generator() -> Generator[bytes, None, None]:
         ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
         if not ok:
             time.sleep(0.02)
-            continue
+            continu
 
         yield boundary + b"\r\n"
         yield b"Content-Type: image/jpeg\r\n"
@@ -96,12 +97,43 @@ def api_status():
 
 @app.post("/api/cmd")
 def api_cmd(cmd: dict = Body(...)):
-    # Accept commands from the UI (pause/resume/stop/estop/goto/home)
-    # For now: store last command and reflect it in status.
     ctype = cmd.get("type")
-    _last_cmd["type"] = ctype
     _status["last_action"] = ctype if ctype else "--"
-    return JSONResponse({"ok": True, "received": cmd})
+
+    try:
+        if ctype == "goto":
+            x = float(cmd["x"])
+            y = float(cmd["y"])
+            z = float(cmd["z"])
+            ok = ik.move_to(x, y, z)  # returns True/False
+            if not ok:
+                _status["last_error"] = "IK failed / joint limit"
+                return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=400)
+            return JSONResponse({"ok": True})
+
+        if ctype == "home":
+            camera.scan_position()
+            return JSONResponse({"ok": True})
+
+        if ctype == "open_gripper":
+            gripper.open_gripper()
+            return JSONResponse({"ok": True})
+
+        if ctype == "close_gripper":
+            gripper.close_gripper()
+            return JSONResponse({"ok": True})
+
+        # placeholders for later
+        if ctype in ("pause", "resume", "stop", "estop"):
+            return JSONResponse({"ok": True, "note": "Not wired to sorter yet"})
+            
+
+        return JSONResponse({"ok": False, "error": f"Unknown cmd type: {ctype}"}, status_code=400)
+
+    except Exception as e:
+        _status["last_error"] = str(e)
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
 
 @app.get("/api/frame.jpg")
 def frame_jpg():

@@ -342,6 +342,11 @@
 
               <div class="hint">Coordinate commands should be validated server-side (limits, collisions, speed caps).</div>
             </div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn" id="btnGripOpen">Open Gripper</button>
+              <button class="btn" id="btnGripClose">Close Gripper</button>
+            </div>
+
 
             <!-- Danger zone styling -->
             <div class="panel danger-zone">
@@ -353,8 +358,12 @@
         </div>
       </div>
     </div>
-
+    
     <script>
+    $("btnGripOpen").onclick  = async () => { try { await postCmd("open_gripper", {}); } catch(e){ alert("Open gripper failed: " + e.message); } };
+    $("btnGripClose").onclick = async () => { try { await postCmd("close_gripper", {}); } catch(e){ alert("Close gripper failed: " + e.message); } };
+
+      
       // ---------- helpers ----------
       const $ = (id) => document.getElementById(id);
 
