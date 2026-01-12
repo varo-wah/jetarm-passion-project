@@ -1,23 +1,18 @@
-# ui_server/server_app.py
 import os
 import time
-from typing import Generator, Optional
-
+from datetime import datetime
+from typing import Generator
 
 import cv2
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import Body, FastAPI
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+
+from ui_server.camera_worker import get_latest_frame_copy, start_camera
 from ui_server.viewer_overlay import annotate_frame
-from fastapi import Body
-from fastapi.responses import JSONResponse
-from datetime import datetime
-from fastapi.responses import Response
+
+# Robot control (manual moves/gripper/home)
 from final_testing.Class_Execution import ik, gripper, camera
-
-
-
-from ui_server.camera_worker import start_camera, get_latest_frame_copy
 
 app = FastAPI()
 
@@ -54,20 +49,19 @@ def mjpeg_generator() -> Generator[bytes, None, None]:
         # Apply overlay BEFORE encoding (and don't let overlay crash the stream)
         try:
             frame = annotate_frame(frame)
-        except Exception as e:
-            # Optional: you can print once or log; for now keep stream alive
-            # print(f"annotate_frame error: {e}")
+        except Exception:
             pass
 
         ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
         if not ok:
             time.sleep(0.02)
-            continu
+            continue
 
         yield boundary + b"\r\n"
         yield b"Content-Type: image/jpeg\r\n"
         yield b"Content-Length: " + str(len(jpg)).encode("ascii") + b"\r\n\r\n"
         yield jpg.tobytes() + b"\r\n"
+
 
 @app.get("/video")
 def video() -> StreamingResponse:
@@ -76,7 +70,8 @@ def video() -> StreamingResponse:
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
 
-# In-memory placeholders (v1). Later the sorter process will update these.
+
+# In-memory placeholders (v1). Later sorter process can update these.
 _status = {
     "state": "IDLE",
     "fps": "--",
@@ -86,14 +81,13 @@ _status = {
     "last_error": "--",
 }
 
-_last_cmd = {"type": None}
 
 @app.get("/api/status")
 def api_status():
-    # Minimal status payload for UI; replace with real telemetry later
     payload = dict(_status)
     payload["server_time"] = datetime.now().strftime("%H:%M:%S")
     return JSONResponse(payload)
+
 
 @app.post("/api/cmd")
 def api_cmd(cmd: dict = Body(...)):
@@ -105,7 +99,7 @@ def api_cmd(cmd: dict = Body(...)):
             x = float(cmd["x"])
             y = float(cmd["y"])
             z = float(cmd["z"])
-            ok = ik.move_to(x, y, z)  # returns True/False
+            ok = ik.move_to(x, y, z)
             if not ok:
                 _status["last_error"] = "IK failed / joint limit"
                 return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=400)
@@ -126,7 +120,6 @@ def api_cmd(cmd: dict = Body(...)):
         # placeholders for later
         if ctype in ("pause", "resume", "stop", "estop"):
             return JSONResponse({"ok": True, "note": "Not wired to sorter yet"})
-            
 
         return JSONResponse({"ok": False, "error": f"Unknown cmd type: {ctype}"}, status_code=400)
 

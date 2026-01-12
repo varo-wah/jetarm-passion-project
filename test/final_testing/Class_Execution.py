@@ -139,6 +139,7 @@ class UserFriendlyMode:
         self.gripper.turn_wrist(90)
         self.gripper.open_gripper()
 
+
 ik = JetArmIK()
 gripper = JetArmGripper()
 camera = ComputerVision(ik, gripper)

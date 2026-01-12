@@ -109,9 +109,7 @@
       }
 
       /* Video */
-      .video-shell{
-        padding:12px;
-      }
+      .video-shell{ padding:12px; }
       .video-frame{
         width:100%;
         aspect-ratio: 16 / 9;
@@ -124,7 +122,7 @@
       .video-frame img{
         width:100%;
         height:100%;
-        object-fit:contain; /* prevents stretching */
+        object-fit:contain;
         display:block;
       }
       .video-overlay{
@@ -172,11 +170,7 @@
       }
       .btn:hover{ filter: brightness(1.05); }
       .btn:active{ transform: translateY(1px); }
-      .btn:disabled{
-        opacity:0.5;
-        cursor:not-allowed;
-        transform:none;
-      }
+      .btn:disabled{ opacity:0.5; cursor:not-allowed; transform:none; }
 
       .btn-primary{
         border-color: rgba(73,182,255,0.55);
@@ -201,7 +195,6 @@
         font-size:13px;
         color:var(--muted);
       }
-      .kv .k{ color: var(--muted); }
       .kv .v{ color: var(--text); font-weight:600; }
 
       .inputs{
@@ -212,6 +205,7 @@
       @media (max-width: 900px){
         .inputs{ grid-template-columns: 1fr; }
       }
+
       .field label{
         display:block;
         font-size:12px;
@@ -228,25 +222,15 @@
         outline:none;
         font-size:14px;
       }
-      .field input:focus{
-        border-color: rgba(73,182,255,0.55);
-        box-shadow: 0 0 0 3px rgba(73,182,255,0.12);
-      }
 
-      .hint{
-        margin-top:8px;
-        font-size:12px;
-        color: var(--muted);
-      }
+      .hint{ margin-top:8px; font-size:12px; color: var(--muted); }
 
       .danger-zone{
         border-color: rgba(255,77,77,0.4);
         background: rgba(40,12,12,0.25);
       }
 
-      .tiny{
-        font-size:12px; color:var(--muted);
-      }
+      .tiny{ font-size:12px; color:var(--muted); }
     </style>
   </head>
 
@@ -315,7 +299,7 @@
                 <button class="btn btn-danger" id="btnStop">Stop</button>
                 <button class="btn btn-danger" id="btnEstop">E-Stop</button>
               </div>
-              <div class="hint">Stop/E-Stop should be treated as a safety-critical action. Your backend must enforce motor safety.</div>
+              <div class="hint">Stop/E-Stop should be treated as safety-critical. Backend must enforce motor safety.</div>
             </div>
 
             <!-- Manual goto/jog -->
@@ -340,30 +324,25 @@
                 <button class="btn" id="btnHome">Home</button>
               </div>
 
+              <div class="row" style="margin-top:10px">
+                <button class="btn" id="btnGripOpen">Open Gripper</button>
+                <button class="btn" id="btnGripClose">Close Gripper</button>
+              </div>
+
               <div class="hint">Coordinate commands should be validated server-side (limits, collisions, speed caps).</div>
             </div>
-            <div class="row" style="margin-top:10px">
-              <button class="btn" id="btnGripOpen">Open Gripper</button>
-              <button class="btn" id="btnGripClose">Close Gripper</button>
-            </div>
 
-
-            <!-- Danger zone styling -->
             <div class="panel danger-zone">
               <div class="tiny">
-                Danger zone: E-Stop should cut motion immediately. Implement it as a high-priority state in the sorter process.
+                Danger zone: E-Stop should cut motion immediately. Implement it as a high-priority state.
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    
-    <script>
-    $("btnGripOpen").onclick  = async () => { try { await postCmd("open_gripper", {}); } catch(e){ alert("Open gripper failed: " + e.message); } };
-    $("btnGripClose").onclick = async () => { try { await postCmd("close_gripper", {}); } catch(e){ alert("Close gripper failed: " + e.message); } };
 
-      
+    <script>
       // ---------- helpers ----------
       const $ = (id) => document.getElementById(id);
 
@@ -397,6 +376,7 @@
       // ---------- button wiring ----------
       $("btnPause").onclick  = async () => { try { await postCmd("pause", {}); } catch(e){ alert("Pause failed: " + e.message); } };
       $("btnResume").onclick = async () => { try { await postCmd("resume", {}); } catch(e){ alert("Resume failed: " + e.message); } };
+
       $("btnStop").onclick   = async () => {
         if (!confirm("STOP the system?")) return;
         try { await postCmd("stop", {}); } catch(e){ alert("Stop failed: " + e.message); }
@@ -415,6 +395,9 @@
       };
 
       $("btnHome").onclick = async () => { try { await postCmd("home", {}); } catch(e){ alert("Home failed: " + e.message); } };
+
+      $("btnGripOpen").onclick  = async () => { try { await postCmd("open_gripper", {}); } catch(e){ alert("Open gripper failed: " + e.message); } };
+      $("btnGripClose").onclick = async () => { try { await postCmd("close_gripper", {}); } catch(e){ alert("Close gripper failed: " + e.message); } };
 
       // ---------- status polling ----------
       async function refreshStatus(){
@@ -437,7 +420,6 @@
         }
       }
 
-      // Start polling
       refreshStatus();
       setInterval(refreshStatus, 350);
     </script>
