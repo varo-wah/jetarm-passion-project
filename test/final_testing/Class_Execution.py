@@ -14,7 +14,7 @@ from ros_robot_controller_msgs.msg import ServosPosition, ServoPosition
 
 class JetArmIK:
     def __init__(self):
-        self.Arm = Arm
+        self.Arm = CKMJetArm()
         self.L1 = 15.0
         self.L2 = 15.0
         self.DEG_PER_PULSE = 0.24

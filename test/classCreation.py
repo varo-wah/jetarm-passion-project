@@ -5,7 +5,8 @@ from ros_robot_controller_msgs.msg import ServosPosition, ServoPosition
 
 class CKMJetArm: 
     def __init__(self):
-        rclpy.init()
+        if not rclpy.ok():
+            rclpy.init()
         self.node = rclpy.create_node('jetarm_test')
         self.pub = self.node.create_publisher(ServosPosition, '/ros_robot_controller/bus_servo/set_position', 10)
         time.sleep(0.5)
