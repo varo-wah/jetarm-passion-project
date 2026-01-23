@@ -45,28 +45,55 @@ def detect_color(frame, x, y, w, h):
     if roi.size == 0:
         return "NEUTRAL"
 
+    # Optional: small boost (helps dark bricks; safe to keep)
+    roi = cv2.convertScaleAbs(roi, alpha=1.20, beta=15)
+
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     H = hsv[:, :, 0]
     S = hsv[:, :, 1]
     V = hsv[:, :, 2]
 
-    # 1) Build a "color pixel" mask (lower thresholds first; tune later)
-    good = (S > 25) & (V > 40)
-    good_count = int(good.sum())
-    total = int(H.size)
-    good_ratio = good_count / max(1, total)
+    # -----------------------------
+    # A) Explicit NEUTRAL detection
+    # -----------------------------
+    v_med = float(np.median(V))
 
-    # If almost no pixels look like real color, call it NEUTRAL
-    if good_ratio < 0.08:   # tune 0.05–0.15
+    # Very dark -> neutral (black/shadow)
+    if v_med < 45:
+        return "NEUTRAL"
+
+    # White/gray detection: lots of pixels are bright but low-saturation
+    V_BRIGHT_MIN = 70
+    S_NEUTRAL_MAX = 35
+
+    bright = (V > V_BRIGHT_MIN)
+    bright_count = int(bright.sum())
+
+    if bright_count >= 30:
+        neutral_like = bright & (S < S_NEUTRAL_MAX)
+        neutral_ratio = int(neutral_like.sum()) / max(1, bright_count)
+
+        # If most bright pixels are low-saturation -> white/gray -> NEUTRAL
+        if neutral_ratio > 0.70:
+            return "NEUTRAL"
+
+    # --------------------------------
+    # B) Color classification (RGB bins)
+    # --------------------------------
+    # Use adaptive V threshold so darker scenes still work
+    V_TH = max(25, v_med * 0.55)
+    S_TH = 20
+
+    good = (S > S_TH) & (V > V_TH)
+    good_ratio = int(good.sum()) / max(1, int(H.size))
+
+    if good_ratio < 0.06:
         return "NEUTRAL"
 
     H_good = H[good].astype(np.uint8)
-
-    # 2) Dominant hue
     hist = cv2.calcHist([H_good], [0], None, [180], [0, 180])
     h_peak = int(np.argmax(hist))
 
-    # 3) Nearest parent hue (RED/GREEN/BLUE)
     parents = {"RED": 0, "GREEN": 60, "BLUE": 120}
 
     def hue_dist(a, b):
@@ -74,7 +101,6 @@ def detect_color(frame, x, y, w, h):
         return min(d, 180 - d)
 
     return min(parents, key=lambda k: hue_dist(h_peak, parents[k]))
-
 
 # =====================================================
 # SNAPSHOT brick detection (FOR AUTOMATION)

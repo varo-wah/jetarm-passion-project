@@ -6,21 +6,16 @@ PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PARENT_DIR)
 
 from classCreation import CKMJetArm
-Arm = CKMJetArm()
 
-# Optional ROS imports (kept safe if ROS isn't installed)
-try:
-    import rclpy
-    from rclpy.node import Node
-    from ros_robot_controller_msgs.msg import ServosPosition, ServoPosition
-except Exception:
-    rclpy = None
-    Node = object
-    ServosPosition = None
-    ServoPosition = None
+# Instantiate hardware ONCE per process (avoid multiple ROS init triggers from this file)
+Arm = CKMJetArm()
 
 
 class JetArmIK:
+    """
+    move_to(x,y,z): Z is TABLE-REFERENCED TIP HEIGHT (cm above table) ✅
+    move_to_wrist(x,y,z): Z is the old WRIST/J3 endpoint height used by your original IK ✅
+    """
     def __init__(self):
         self.Arm = Arm
         self.L1 = 15.0
@@ -33,29 +28,15 @@ class JetArmIK:
         self.ELBOW_UP = True
         self.last_base_angle = 0.0
 
-        # -------------------------------
-        # TABLE-Z CALIBRATION (YOUR DATA)
-        # -------------------------------
-        # Measured (gripper OPEN, fixed wrist angle):
-        # (0,15,20) -> z_tip=11
-        # (0,15,15) -> z_tip=7
-        #
-        # => z_tip ≈ 0.8*z_wrist + (-4.5) - sag(r)
+        # --- Your calibration (OPEN gripper, fixed wrist angle) ---
+        # (0,15,20)->11 and (0,15,15)->7  => slope 0.8, bias -4.5
+        # z_tip ≈ 0.8*z_wrist - 4.5 - sag(r)
         self.Z_TIP_PER_Z_WRIST = 0.8
         self.Z_TIP_BIAS_CM = -4.5
 
-        # sag(r) derived at z_wrist=15:
-        # r=10 => 0.0 ; r=15 => 0.5 ; r=20 => 1.1 ; r=25 => 1.7
-        self.SAG_TABLE = [
-            (10.0, 0.0),
-            (15.0, 0.5),
-            (20.0, 1.1),
-            (25.0, 1.7),
-        ]
-        self.SAG_MAX_CM = 5.0  # clamp for safety
-
-        # Optional: when gripper closes, your "lowest tip point" changes (~+2 cm).
-        self.GRIPPER_CLOSE_LIFT_CM = 2.0
+        # sag(r) at z_wrist=15: r=10->0.0, r=15->0.5, r=20->1.1, r=25->1.7
+        self.SAG_TABLE = [(10.0, 0.0), (15.0, 0.5), (20.0, 1.1), (25.0, 1.7)]
+        self.SAG_MAX_CM = 5.0
 
     def base_to_pulse(self, angle_deg):
         return int(round(angle_deg / self.DEG_PER_PULSE + self.BASE_ZERO_OFFSET))
@@ -63,33 +44,53 @@ class JetArmIK:
     def arm_to_pulse(self, arm_deg):
         return int(round(arm_deg / self.DEG_PER_PULSE + self.ANGLE_ZERO_OFFSET))
 
-    def calculate_angles(self, x, y, z):
-        # 1) Base angle from atan2 in [-180, 180]
+    def _sag_cm(self, r_cm: float) -> float:
+        t = self.SAG_TABLE
+        if r_cm <= t[0][0]:
+            return max(0.0, min(self.SAG_MAX_CM, t[0][1]))
+        if r_cm >= t[-1][0]:
+            return max(0.0, min(self.SAG_MAX_CM, t[-1][1]))
+
+        for i in range(len(t) - 1):
+            r0, s0 = t[i]
+            r1, s1 = t[i + 1]
+            if r0 <= r_cm <= r1:
+                u = (r_cm - r0) / (r1 - r0)
+                return max(0.0, min(self.SAG_MAX_CM, s0 + u * (s1 - s0)))
+
+        return 0.0
+
+    def _z_table_to_wrist(self, x: float, y: float, z_table_cm: float) -> float:
+        # z_tip ≈ a*z_wrist + b - sag(r)  =>  z_wrist = (z_tip - b + sag)/a
+        r = math.hypot(x, y)
+        sag = self._sag_cm(r)
+        a = self.Z_TIP_PER_Z_WRIST
+        b = self.Z_TIP_BIAS_CM
+        return (z_table_cm - b + sag) / a
+
+    def calculate_angles(self, x, y, z_wrist):
+        # 1) Base angle
         base_angle = math.degrees(math.atan2(y, x))
 
-        # 2) Seam-fix ONLY at the -180/+180 wrap
+        # 2) Continuity seam-fix
         prev = getattr(self, "last_base_angle", 0.0)
         if prev - base_angle > 180.0:
             base_angle += 360.0
         elif base_angle - prev > 180.0:
             base_angle -= 360.0
-
-        # 3) Store for wrist alignment + continuity next call
         self.last_base_angle = base_angle
 
-        # --- Existing planar IK math (kept, but with safer guards) ---
+        # 3) Planar IK (your method, with a safe reach guard)
         l = math.hypot(x, y)
-        d = math.hypot(l, z)
-
-        # This IK assumes L1 == L2 and uses an isosceles construction (h=d/2).
-        # Must have d <= 2*L1, otherwise acos() will fail.
+        d = math.hypot(l, z_wrist)
         h = d / 2.0
+
         cos_arg = h / self.L1
         if cos_arg < -1.0 or cos_arg > 1.0:
             raise ValueError("Target out of reach for current IK geometry")
 
         theta = math.degrees(math.acos(cos_arg))
-        phi = math.degrees(math.atan2(z, l))
+        phi = math.degrees(math.atan2(z_wrist, l))
 
         if self.ELBOW_UP:
             L1_angle = phi + theta
@@ -106,47 +107,7 @@ class JetArmIK:
 
         return base_angle, L1_angle, L2_angle, L3_angle
 
-    # -------------------------------
-    # TABLE-Z HELPERS (NEW)
-    # -------------------------------
-    def sag_cm(self, r_cm: float) -> float:
-        table = self.SAG_TABLE
-
-        if r_cm <= table[0][0]:
-            return max(0.0, min(self.SAG_MAX_CM, table[0][1]))
-        if r_cm >= table[-1][0]:
-            return max(0.0, min(self.SAG_MAX_CM, table[-1][1]))
-
-        for i in range(len(table) - 1):
-            r0, s0 = table[i]
-            r1, s1 = table[i + 1]
-            if r0 <= r_cm <= r1:
-                t = (r_cm - r0) / (r1 - r0)
-                sag = s0 + t * (s1 - s0)
-                return max(0.0, min(self.SAG_MAX_CM, sag))
-
-        return 0.0
-
-    def z_table_to_wrist(self, x: float, y: float, z_table_cm: float) -> float:
-        # z_tip ≈ a*z_wrist + b - sag(r)
-        # => z_wrist = (z_tip - b + sag(r)) / a
-        r = math.hypot(x, y)
-        sag = self.sag_cm(r)
-        a = self.Z_TIP_PER_Z_WRIST
-        b = self.Z_TIP_BIAS_CM
-        return (z_table_cm - b + sag) / a
-
-    def move_to_table(self, x: float, y: float, z_table_cm: float) -> bool:
-        z_wrist = self.z_table_to_wrist(x, y, z_table_cm)
-        return self.move_to(x, y, z_wrist)
-
-    def move_to(self, x, y, z):
-        try:
-            base_angle, L1_angle, L2_angle, L3_angle = self.calculate_angles(x, y, z)
-        except ValueError as e:
-            print(f"❌ IK math failed for x={x:.1f}, y={y:.1f}, z={z:.1f}  ({e})")
-            return False
-
+    def _apply_pulses(self, base_angle, L1_angle, L2_angle, L3_angle, x, y, z_wrist):
         base_pulse = self.base_to_pulse(base_angle)
         L1_pulse = self.arm_to_pulse(L1_angle)
         L2_pulse = self.arm_to_pulse(L2_angle)
@@ -155,11 +116,8 @@ class JetArmIK:
         pulses = {"base": base_pulse, "L1": L1_pulse, "L2": L2_pulse, "L3": L3_pulse}
 
         for name, p in pulses.items():
-            if not isinstance(p, int):
-                p = int(round(p))
-                pulses[name] = p
             if p < 0 or p > 1000:
-                print(f"❌ Joint limit: {name} pulse={p} (x={x:.1f}, y={y:.1f}, z={z:.1f})")
+                print(f"❌ Joint limit: {name} pulse={p} (x={x:.1f}, y={y:.1f}, z_wrist={z_wrist:.1f})")
                 return False
 
         print(f"Moving to: {pulses['base']}, {pulses['L1']}, {pulses['L2']}, {pulses['L3']}")
@@ -169,15 +127,27 @@ class JetArmIK:
         self.Arm.moveJetArm(4, pulses["L3"])
         return True
 
+    def move_to_wrist(self, x, y, z_wrist):
+        # Old behavior (raw IK wrist Z)
+        try:
+            base_angle, L1_angle, L2_angle, L3_angle = self.calculate_angles(x, y, z_wrist)
+        except ValueError as e:
+            print(f"❌ IK math failed for x={x:.1f}, y={y:.1f}, z_wrist={z_wrist:.1f} ({e})")
+            return False
+        return self._apply_pulses(base_angle, L1_angle, L2_angle, L3_angle, x, y, z_wrist)
+
+    def move_to(self, x, y, z_table):
+        # New default behavior: table-referenced tip height
+        z_wrist = self._z_table_to_wrist(x, y, z_table)
+        return self.move_to_wrist(x, y, z_wrist)
+
 
 class JetArmGripper:
     def __init__(self, ik: JetArmIK):
         self.Arm = Arm
         self.ik = ik
-
         self.openGripperPulse = 150
         self.closeGripperPulse = 850
-
         self.BASE_ZERO_OFFSET = 125.0
         self.DEG_PER_PULSE = 0.24
 
@@ -204,8 +174,8 @@ class ComputerVision:
         self.gripper = gripper
 
     def scan_position(self):
-        # Example: 15 cm above table at (0,15)
-        self.ik.move_to_table(0, 15, 15)
+        # Preserve your previous behavior by using WRIST-Z here:
+        self.ik.move_to_wrist(0, 15, 23)
         self.gripper.turn_wrist(90)
         self.gripper.open_gripper()
 
