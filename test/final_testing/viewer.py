@@ -63,7 +63,14 @@ while True:
         cv2.drawContours(frame, [box], 0, (0, 255, 0), 2)
 
         x, y, bw, bh = cv2.boundingRect(c)
-        color = detect_color(frame, x, y, bw, bh)
+        pad = int(min(bw, bh) * 0.08)
+        pad = max(2, min(pad, 6))
+        x2 = x + pad
+        y2 = y + pad
+        bw2 = max(1, bw - 2 * pad)
+        bh2 = max(1, bh - 2 * pad)
+
+        color = detect_color(frame, x2, y2, bw2, bh2)
 
         # RAW coordinate
         Xr_raw, Yr_raw = pixel_to_robot(cx, cy)
