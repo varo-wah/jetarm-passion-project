@@ -299,6 +299,10 @@
                 <button class="btn btn-danger" id="btnStop">Stop</button>
                 <button class="btn btn-danger" id="btnEstop">E-Stop</button>
               </div>
+              <div class="row">
+                <button class="btn btn-primary" id="btnScannerStart">Start Vision Scanner</button>
+                <button class="btn btn-danger" id="btnScannerStop">Stop Vision Scanner</button>
+              </div>
               <div class="hint">Stop/E-Stop should be treated as safety-critical. Backend must enforce motor safety.</div>
             </div>
 
@@ -372,6 +376,27 @@
         const n = Number(v);
         return Number.isFinite(n) ? n : null;
       }
+
+      async function postScanner(path){
+          const res = await fetch(path, { method: "POST" });
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(txt || ("HTTP " + res.status));
+          }
+          return await res.json();
+        }
+
+        $("btnScannerStart").onclick = async () => {
+          try { await postScanner("/api/scanner/start"); }
+          catch(e){ alert("Start Vision Scanner failed: " + e.message); }
+        };
+
+        $("btnScannerStop").onclick = async () => {
+          if (!confirm("Stop Vision Scanner?")) return;
+          try { await postScanner("/api/scanner/stop"); }
+          catch(e){ alert("Stop Vision Scanner failed: " + e.message); }
+        };
+
 
       // ---------- button wiring ----------
       $("btnPause").onclick  = async () => { try { await postCmd("pause", {}); } catch(e){ alert("Pause failed: " + e.message); } };
