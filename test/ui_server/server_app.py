@@ -18,7 +18,11 @@ from ui_server.camera_worker import get_latest_frame_copy, start_camera
 from ui_server.viewer_overlay import annotate_frame
 
 # Robot control (manual moves/gripper/home)
-from final_testing.Class_Execution import ik, gripper, camera
+from final_testing.Class_Execution import (
+    ik, gripper, camera,
+    stop_motion, estop_motion,
+    pause_system, resume_system
+)
 
 app = FastAPI()
 
@@ -126,8 +130,28 @@ def api_cmd(cmd: dict = Body(...)):
             return JSONResponse({"ok": True})
 
         # placeholders for later
-        if ctype in ("pause", "resume", "stop", "estop"):
-            return JSONResponse({"ok": True, "note": "Not wired to sorter yet"})
+        if ctype == "stop":
+            stop_motion()
+            _status["state"] = "STOPPED"
+            return JSONResponse({"ok": True})
+
+        if ctype == "estop":
+            estop_motion()
+            _status["state"] = "ESTOP"
+            return JSONResponse({"ok": True})
+
+        if ctype == "pause":
+            pause_system()
+            _status["state"] = "PAUSED"
+            return JSONResponse({"ok": True})
+
+        if ctype == "resume":
+            ok = resume_system()
+            if not ok:
+                _status["last_error"] = "Cannot resume: E-STOP latched"
+                return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=400)
+            _status["state"] = "IDLE"
+            return JSONResponse({"ok": True})
 
         return JSONResponse({"ok": False, "error": f"Unknown cmd type: {ctype}"}, status_code=400)
 
