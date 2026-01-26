@@ -22,7 +22,7 @@ RED_BUCKET_X, RED_BUCKET_Y = -15, -8
 BLUE_BUCKET_X, BLUE_BUCKET_Y = 20, 3
 GREEN_BUCKET_X, GREEN_BUCKET_Y = -20, 3
 APPROACH_Z = 7.0
-APPROACH_BUCKET = 13.0
+APPROACH_BUCKET = 14.0
 PICK_Z = 3.0
 DROP_Z = 10.0
 
@@ -183,7 +183,7 @@ def pick_and_drop(brick):
         return False
 
     # EXTRA) GO TO SCAN POSITION
-    ik.move_to(0, 15, 23)
+    ik.move_to_wrist(0, 15, 25)
     time.sleep(GRIP_SETTLE)
 
     # 7) Move to bucket (approach)
