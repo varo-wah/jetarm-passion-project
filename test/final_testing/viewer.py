@@ -38,6 +38,23 @@ while True:
         25, 5
     )
 
+    # -----------------------------
+    # ROI LIMIT: ignore edges/bottom
+    # -----------------------------
+    Ht, Wt = thresh.shape[:2]
+    x0 = int(Wt * ROI_X0_FRAC); x1 = int(Wt * ROI_X1_FRAC)
+    y0 = int(Ht * ROI_Y0_FRAC); y1 = int(Ht * ROI_Y1_FRAC)
+
+    roi_mask = np.zeros_like(thresh)
+    roi_mask[y0:y1, x0:x1] = 255
+    thresh = cv2.bitwise_and(thresh, roi_mask)
+
+    # Draw ROI on the viewer (so you can tune it)
+    cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 255, 255), 2)
+    cv2.putText(frame, "DETECTION ROI", (x0, max(20, y0 - 10)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+
     contours, _ = cv2.findContours(
         thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
