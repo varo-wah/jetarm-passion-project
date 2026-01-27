@@ -323,6 +323,43 @@
                 </div>
               </div>
 
+              <div class="panel">
+                <div class="title" style="margin-bottom:8px">Jog Controls</div>
+
+                <div style="display:grid; grid-template-columns: 1fr 180px 1fr; gap:12px; align-items:center;">
+                  <!-- Z column -->
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    <button class="btn btn-primary" id="btnZUp">Z Up</button>
+                    <button class="btn btn-primary" id="btnZDown">Z Down</button>
+                  </div>
+
+                  <!-- D-pad -->
+                  <div style="display:grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px 60px; gap:8px; justify-content:center;">
+                    <div></div>
+                    <button class="btn btn-primary" id="btnFwd" style="min-width:0; padding:10px;">↑</button>
+                    <div></div>
+
+                    <button class="btn btn-primary" id="btnLeft" style="min-width:0; padding:10px;">←</button>
+                    <button class="btn btn-danger" id="btnCenter" style="min-width:0; padding:10px;">●</button>
+                    <button class="btn btn-primary" id="btnRight" style="min-width:0; padding:10px;">→</button>
+
+                    <div></div>
+                    <button class="btn btn-primary" id="btnBack" style="min-width:0; padding:10px;">↓</button>
+                    <div></div>
+                  </div>
+
+                  <!-- Step size -->
+                  <div>
+                    <div class="field">
+                      <label for="stepIn">Step (cm)</label>
+                      <input id="stepIn" inputmode="decimal" value="0.5" />
+                    </div>
+                    <div class="hint">Tap or hold a direction to jog. Center resets to a safe pose.</div>
+                  </div>
+                </div>
+              </div>
+
+
               <div class="row" style="margin-top:10px">
                 <button class="btn btn-primary" id="btnGoto">Go To (X,Y,Z)</button>
                 <button class="btn" id="btnHome">Home</button>
@@ -410,6 +447,38 @@
         if (!confirm("E-STOP NOW?")) return;
         try { await postCmd("estop", {}); } catch(e){ alert("E-Stop failed: " + e.message); }
       };
+
+      const joy = $("joystick");
+      const stick = $("stick");
+
+      let joyActive = false;
+
+      joy.onmousedown = (e) => joyActive = true;
+      document.onmouseup = () => joyActive = false;
+
+      joy.onmousemove = async (e) => {
+        if (!joyActive) return;
+
+        const r = joy.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+
+        let dx = (e.clientX - cx) / 60;
+        let dy = (e.clientY - cy) / 60;
+
+        dx = Math.max(-1, Math.min(1, dx));
+        dy = Math.max(-1, Math.min(1, dy));
+
+        stick.style.left = 55 + dx * 40 + "px";
+        stick.style.top  = 55 + dy * 40 + "px";
+
+        await fetch("/api/joystick", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ dx, dy, dz: 0 })
+        });
+      };
+
 
       $("btnGoto").onclick = async () => {
         const x = numOrNull($("xIn").value);

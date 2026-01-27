@@ -24,6 +24,9 @@ from final_testing.Class_Execution import (
     pause_system, resume_system
 )
 
+joy_target = {"x": 0.0, "y": 15.0, "z": 20.0}
+JOY_SPEED = 0.3  # cm per tick
+
 app = FastAPI()
 
 # Serve static files (index.html, etc.)
@@ -93,6 +96,26 @@ _status = {
 _scanner_proc: subprocess.Popen | None = None
 SCANNER_PATH = Path(__file__).resolve().parents[1] / "final_testing" / "Vision_Scanner.py"
 
+@app.post("/api/joystick")
+def joystick(cmd: dict = Body(...)):
+    dx = float(cmd.get("dx", 0))
+    dy = float(cmd.get("dy", 0))
+    dz = float(cmd.get("dz", 0))
+
+    joy_target["x"] += dx * JOY_SPEED
+    joy_target["y"] += dy * JOY_SPEED
+    joy_target["z"] += dz * JOY_SPEED
+
+    ok = ik.move_to(
+        joy_target["x"],
+        joy_target["y"],
+        joy_target["z"]
+    )
+
+    if not ok:
+        return JSONResponse({"ok": False, "error": "IK failed"}, status_code=400)
+
+    return JSONResponse({"ok": True, "target": joy_target})
 
 @app.get("/api/status")
 def api_status():
