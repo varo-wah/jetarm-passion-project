@@ -9,10 +9,10 @@ from coordinatelogic import pixel_to_robot, detect_color
 X_history = []
 Y_history = []
 angle_history = []
-ROI_X0_FRAC = 0.18
-ROI_X1_FRAC = 0.82
-ROI_Y0_FRAC = 0.05
-ROI_Y1_FRAC = 0.62
+ROI_X0_FRAC = 0.12
+ROI_X1_FRAC = 0.88
+ROI_Y0_FRAC = 0.03
+ROI_Y1_FRAC = 0.75
 SMOOTH_N = 5
 
 def smooth(val, history):
