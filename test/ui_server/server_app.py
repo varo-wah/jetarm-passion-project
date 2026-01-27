@@ -7,12 +7,10 @@ import signal
 import subprocess
 from pathlib import Path
 
-
 import cv2
 from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-
 
 from ui_server.camera_worker import get_latest_frame_copy, start_camera
 from ui_server.viewer_overlay import annotate_frame
@@ -24,8 +22,22 @@ from final_testing.Class_Execution import (
     pause_system, resume_system
 )
 
-joy_target = {"x": 0.0, "y": 15.0, "z": 20.0}
-JOY_SPEED = 0.3  # cm per tick
+# -------------------------------------------------
+# Joystick / Jog state
+# -------------------------------------------------
+joy_target = {"x": 0.0, "y": 15.0, "z": 13.0}
+JOY_SPEED = 0.3  # cm per "tick" (frontend converts cm -> ticks)
+
+# Optional safety limits (adjust for your rig)
+JOY_LIMITS = {
+    "x": (-30.0, 30.0),
+    "y": (0.0, 40.0),
+    "z": (0.0, 40.0),
+}
+
+def _clamp(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
 
 app = FastAPI()
 
@@ -93,8 +105,10 @@ _status = {
     "sort_count": 0,
     "last_error": "--",
 }
+
 _scanner_proc: subprocess.Popen | None = None
 SCANNER_PATH = Path(__file__).resolve().parents[1] / "final_testing" / "Vision_Scanner.py"
+
 
 @app.post("/api/joystick")
 def joystick(cmd: dict = Body(...)):
@@ -102,9 +116,15 @@ def joystick(cmd: dict = Body(...)):
     dy = float(cmd.get("dy", 0))
     dz = float(cmd.get("dz", 0))
 
+    # Update target using server speed (cm per tick)
     joy_target["x"] += dx * JOY_SPEED
     joy_target["y"] += dy * JOY_SPEED
     joy_target["z"] += dz * JOY_SPEED
+
+    # Optional clamping to workspace
+    joy_target["x"] = _clamp(joy_target["x"], *JOY_LIMITS["x"])
+    joy_target["y"] = _clamp(joy_target["y"], *JOY_LIMITS["y"])
+    joy_target["z"] = _clamp(joy_target["z"], *JOY_LIMITS["z"])
 
     ok = ik.move_to(
         joy_target["x"],
@@ -117,12 +137,38 @@ def joystick(cmd: dict = Body(...)):
 
     return JSONResponse({"ok": True, "target": joy_target})
 
+
+@app.post("/api/joystick/reset")
+def joystick_reset():
+    # Reset to your preferred “safe jog pose”
+    joy_target["x"] = 0.0
+    joy_target["y"] = 15.0
+    joy_target["z"] = 13.0
+
+    # Clamp (in case you changed limits)
+    joy_target["x"] = _clamp(joy_target["x"], *JOY_LIMITS["x"])
+    joy_target["y"] = _clamp(joy_target["y"], *JOY_LIMITS["y"])
+    joy_target["z"] = _clamp(joy_target["z"], *JOY_LIMITS["z"])
+
+    ok = ik.move_to(joy_target["x"], joy_target["y"], joy_target["z"])
+    if not ok:
+        return JSONResponse({"ok": False, "error": "IK failed"}, status_code=400)
+
+    return JSONResponse({"ok": True, "target": joy_target})
+
+
 @app.get("/api/status")
 def api_status():
     payload = dict(_status)
     payload["server_time"] = datetime.now().strftime("%H:%M:%S")
     payload["scanner_running"] = (_scanner_proc is not None and _scanner_proc.poll() is None)
+
+    # Expose joystick config/state for the UI
+    payload["joy_speed"] = JOY_SPEED
+    payload["joy_target"] = dict(joy_target)
+
     return JSONResponse(payload)
+
 
 @app.post("/api/cmd")
 def api_cmd(cmd: dict = Body(...)):
@@ -152,7 +198,6 @@ def api_cmd(cmd: dict = Body(...)):
             gripper.close_gripper()
             return JSONResponse({"ok": True})
 
-        # placeholders for later
         if ctype == "stop":
             stop_motion()
             _status["state"] = "STOPPED"
@@ -182,6 +227,7 @@ def api_cmd(cmd: dict = Body(...)):
         _status["last_error"] = str(e)
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
+
 @app.post("/api/scanner/start")
 def scanner_start():
     global _scanner_proc
@@ -198,7 +244,6 @@ def scanner_start():
     env = os.environ.copy()
 
     # IMPORTANT: force Vision_Scanner to use THIS server for frames (no camera conflict)
-    # 127.0.0.1 is correct because Vision_Scanner runs on the same Jetson as this server.
     env["UI_SERVER"] = "http://127.0.0.1:8000"
 
     _scanner_proc = subprocess.Popen(
@@ -236,6 +281,7 @@ def scanner_stop():
     _status["state"] = "IDLE"
     _status["last_action"] = "scanner_stop"
     return JSONResponse({"ok": True, "running": False})
+
 
 @app.get("/api/frame.jpg")
 def frame_jpg():

@@ -82,7 +82,6 @@
         grid-template-columns: 1.6fr 1fr;
         gap:14px;
       }
-
       @media (max-width: 900px){
         .grid{ grid-template-columns: 1fr; }
       }
@@ -106,6 +105,21 @@
         color:var(--muted);
         letter-spacing:0.3px;
         text-transform:uppercase;
+      }
+
+      /* Panels */
+      .panel{
+        background: rgba(15,22,34,0.55);
+        border:1px solid rgba(35,50,71,0.85);
+        border-radius: 14px;
+        padding:12px;
+      }
+      .panel .title{
+        font-size:13px;
+        color:var(--muted);
+        letter-spacing:0.3px;
+        text-transform:uppercase;
+        margin-bottom:8px;
       }
 
       /* Video */
@@ -181,16 +195,9 @@
         box-shadow: 0 0 0 1px rgba(255,77,77,0.15) inset;
       }
 
-      .panel{
-        background: rgba(15,22,34,0.55);
-        border:1px solid rgba(35,50,71,0.85);
-        border-radius: 14px;
-        padding:12px;
-      }
-
       .kv{
         display:grid;
-        grid-template-columns: 110px 1fr;
+        grid-template-columns: 120px 1fr;
         gap:8px 10px;
         font-size:13px;
         color:var(--muted);
@@ -247,6 +254,9 @@
           <span style="opacity:.55">|</span>
           <span>FPS:</span>
           <b id="fpsText">--</b>
+          <span style="opacity:.55">|</span>
+          <span>Scanner:</span>
+          <b id="scannerText">--</b>
         </div>
       </div>
     </div>
@@ -268,7 +278,7 @@
                 <div class="tag">Last detection: <b id="lastDetText">--</b></div>
               </div>
             </div>
-            <div class="hint">Tip: if stream freezes, refresh once. Persistent freezes usually mean the overlay crashed or camera is busy.</div>
+            <div class="hint">Tip: if stream freezes, refresh once. Persistent freezes usually means the overlay crashed or camera is busy.</div>
           </div>
         </div>
 
@@ -285,6 +295,8 @@
               <div class="kv">
                 <div class="k">Connection</div><div class="v" id="connText">--</div>
                 <div class="k">Sort count</div><div class="v" id="countText">--</div>
+                <div class="k">Scanner</div><div class="v" id="scannerText2">--</div>
+                <div class="k">Jog target</div><div class="v" id="jogText">--</div>
                 <div class="k">Last error</div><div class="v" id="errText">--</div>
               </div>
             </div>
@@ -303,11 +315,13 @@
                 <button class="btn btn-primary" id="btnScannerStart">Start Vision Scanner</button>
                 <button class="btn btn-danger" id="btnScannerStop">Stop Vision Scanner</button>
               </div>
-              <div class="hint">Stop/E-Stop should be treated as safety-critical. Backend must enforce motor safety.</div>
+              <div class="hint">Stop/E-Stop is safety-critical. Backend must enforce motor safety.</div>
             </div>
 
-            <!-- Manual goto/jog -->
+            <!-- Manual GoTo -->
             <div class="panel">
+              <div class="title">Go To</div>
+
               <div class="inputs">
                 <div class="field">
                   <label for="xIn">X</label>
@@ -323,43 +337,6 @@
                 </div>
               </div>
 
-              <div class="panel">
-                <div class="title" style="margin-bottom:8px">Jog Controls</div>
-
-                <div style="display:grid; grid-template-columns: 1fr 180px 1fr; gap:12px; align-items:center;">
-                  <!-- Z column -->
-                  <div style="display:flex; flex-direction:column; gap:10px;">
-                    <button class="btn btn-primary" id="btnZUp">Z Up</button>
-                    <button class="btn btn-primary" id="btnZDown">Z Down</button>
-                  </div>
-
-                  <!-- D-pad -->
-                  <div style="display:grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px 60px; gap:8px; justify-content:center;">
-                    <div></div>
-                    <button class="btn btn-primary" id="btnFwd" style="min-width:0; padding:10px;">↑</button>
-                    <div></div>
-
-                    <button class="btn btn-primary" id="btnLeft" style="min-width:0; padding:10px;">←</button>
-                    <button class="btn btn-danger" id="btnCenter" style="min-width:0; padding:10px;">●</button>
-                    <button class="btn btn-primary" id="btnRight" style="min-width:0; padding:10px;">→</button>
-
-                    <div></div>
-                    <button class="btn btn-primary" id="btnBack" style="min-width:0; padding:10px;">↓</button>
-                    <div></div>
-                  </div>
-
-                  <!-- Step size -->
-                  <div>
-                    <div class="field">
-                      <label for="stepIn">Step (cm)</label>
-                      <input id="stepIn" inputmode="decimal" value="0.5" />
-                    </div>
-                    <div class="hint">Tap or hold a direction to jog. Center resets to a safe pose.</div>
-                  </div>
-                </div>
-              </div>
-
-
               <div class="row" style="margin-top:10px">
                 <button class="btn btn-primary" id="btnGoto">Go To (X,Y,Z)</button>
                 <button class="btn" id="btnHome">Home</button>
@@ -370,12 +347,50 @@
                 <button class="btn" id="btnGripClose">Close Gripper</button>
               </div>
 
-              <div class="hint">Coordinate commands should be validated server-side (limits, collisions, speed caps).</div>
+              <div class="hint">Validation should be server-side (limits, collisions, speed caps).</div>
             </div>
 
+            <!-- Jog Controls (D-pad) -->
+            <div class="panel">
+              <div class="title">Jog Controls</div>
+
+              <div style="display:grid; grid-template-columns: 1fr 180px 1fr; gap:12px; align-items:center;">
+                <!-- Z column -->
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                  <button class="btn btn-primary" id="btnZUp">Z Up</button>
+                  <button class="btn btn-primary" id="btnZDown">Z Down</button>
+                </div>
+
+                <!-- D-pad -->
+                <div style="display:grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px 60px; gap:8px; justify-content:center;">
+                  <div></div>
+                  <button class="btn btn-primary" id="btnFwd" style="min-width:0; padding:10px;">↑</button>
+                  <div></div>
+
+                  <button class="btn btn-primary" id="btnLeft" style="min-width:0; padding:10px;">←</button>
+                  <button class="btn btn-danger" id="btnCenter" style="min-width:0; padding:10px;">●</button>
+                  <button class="btn btn-primary" id="btnRight" style="min-width:0; padding:10px;">→</button>
+
+                  <div></div>
+                  <button class="btn btn-primary" id="btnBack" style="min-width:0; padding:10px;">↓</button>
+                  <div></div>
+                </div>
+
+                <!-- Step size -->
+                <div>
+                  <div class="field">
+                    <label for="stepIn">Step (cm)</label>
+                    <input id="stepIn" inputmode="decimal" value="0.5" />
+                  </div>
+                  <div class="hint">Tap to jog. ● resets to the default jog pose.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Danger zone -->
             <div class="panel danger-zone">
               <div class="tiny">
-                Danger zone: E-Stop should cut motion immediately. Implement it as a high-priority state.
+                Danger zone: E-Stop should cut motion immediately and latch until cleared.
               </div>
             </div>
           </div>
@@ -386,6 +401,7 @@
     <script>
       // ---------- helpers ----------
       const $ = (id) => document.getElementById(id);
+      let joySpeed = 0.3; // will be overwritten by /api/status if provided
 
       function setConn(ok){
         $("connDot").style.background = ok ? "var(--good)" : "var(--bad)";
@@ -409,31 +425,59 @@
         return await res.json();
       }
 
+      async function postScanner(path){
+        const res = await fetch(path, { method: "POST" });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ("HTTP " + res.status));
+        }
+        return await res.json();
+      }
+
       function numOrNull(v){
         const n = Number(v);
         return Number.isFinite(n) ? n : null;
       }
 
-      async function postScanner(path){
-          const res = await fetch(path, { method: "POST" });
-          if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(txt || ("HTTP " + res.status));
-          }
-          return await res.json();
+      function stepValCm(){
+        const n = Number($("stepIn").value);
+        return Number.isFinite(n) ? n : 0.5;
+      }
+
+      // Server joystick endpoint uses: joy_target += dx * JOY_SPEED
+      // We want stepIn in cm, so convert cm -> ticks by dividing by JOY_SPEED.
+      function cmToTicks(cm){
+        const s = Number(joySpeed);
+        if (!Number.isFinite(s) || s <= 0) return cm;
+        return cm / s;
+      }
+
+      async function postJoystick(dx_cm, dy_cm, dz_cm){
+        const body = {
+          dx: cmToTicks(dx_cm),
+          dy: cmToTicks(dy_cm),
+          dz: cmToTicks(dz_cm),
+        };
+        const res = await fetch("/api/joystick", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ("HTTP " + res.status));
         }
+        return await res.json();
+      }
 
-        $("btnScannerStart").onclick = async () => {
-          try { await postScanner("/api/scanner/start"); }
-          catch(e){ alert("Start Vision Scanner failed: " + e.message); }
-        };
-
-        $("btnScannerStop").onclick = async () => {
-          if (!confirm("Stop Vision Scanner?")) return;
-          try { await postScanner("/api/scanner/stop"); }
-          catch(e){ alert("Stop Vision Scanner failed: " + e.message); }
-        };
-
+      async function postJoystickReset(){
+        const res = await fetch("/api/joystick/reset", { method: "POST" });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ("HTTP " + res.status));
+        }
+        return await res.json();
+      }
 
       // ---------- button wiring ----------
       $("btnPause").onclick  = async () => { try { await postCmd("pause", {}); } catch(e){ alert("Pause failed: " + e.message); } };
@@ -443,42 +487,22 @@
         if (!confirm("STOP the system?")) return;
         try { await postCmd("stop", {}); } catch(e){ alert("Stop failed: " + e.message); }
       };
+
       $("btnEstop").onclick  = async () => {
         if (!confirm("E-STOP NOW?")) return;
         try { await postCmd("estop", {}); } catch(e){ alert("E-Stop failed: " + e.message); }
       };
 
-      const joy = $("joystick");
-      const stick = $("stick");
-
-      let joyActive = false;
-
-      joy.onmousedown = (e) => joyActive = true;
-      document.onmouseup = () => joyActive = false;
-
-      joy.onmousemove = async (e) => {
-        if (!joyActive) return;
-
-        const r = joy.getBoundingClientRect();
-        const cx = r.left + r.width / 2;
-        const cy = r.top + r.height / 2;
-
-        let dx = (e.clientX - cx) / 60;
-        let dy = (e.clientY - cy) / 60;
-
-        dx = Math.max(-1, Math.min(1, dx));
-        dy = Math.max(-1, Math.min(1, dy));
-
-        stick.style.left = 55 + dx * 40 + "px";
-        stick.style.top  = 55 + dy * 40 + "px";
-
-        await fetch("/api/joystick", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ dx, dy, dz: 0 })
-        });
+      $("btnScannerStart").onclick = async () => {
+        try { await postScanner("/api/scanner/start"); }
+        catch(e){ alert("Start Vision Scanner failed: " + e.message); }
       };
 
+      $("btnScannerStop").onclick = async () => {
+        if (!confirm("Stop Vision Scanner?")) return;
+        try { await postScanner("/api/scanner/stop"); }
+        catch(e){ alert("Stop Vision Scanner failed: " + e.message); }
+      };
 
       $("btnGoto").onclick = async () => {
         const x = numOrNull($("xIn").value);
@@ -493,7 +517,26 @@
       $("btnGripOpen").onclick  = async () => { try { await postCmd("open_gripper", {}); } catch(e){ alert("Open gripper failed: " + e.message); } };
       $("btnGripClose").onclick = async () => { try { await postCmd("close_gripper", {}); } catch(e){ alert("Close gripper failed: " + e.message); } };
 
+      // Jog (D-pad): ↑ = +Y, ↓ = -Y, → = +X, ← = -X, Z Up/Down = ±Z
+      $("btnLeft").onclick  = async () => { try { await postJoystick(-stepValCm(), 0, 0); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnRight").onclick = async () => { try { await postJoystick( stepValCm(), 0, 0); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnFwd").onclick   = async () => { try { await postJoystick(0, stepValCm(), 0); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnBack").onclick  = async () => { try { await postJoystick(0,-stepValCm(), 0); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnZUp").onclick   = async () => { try { await postJoystick(0, 0, stepValCm()); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnZDown").onclick = async () => { try { await postJoystick(0, 0,-stepValCm()); } catch(e){ alert("Jog failed: " + e.message); } };
+
+      $("btnCenter").onclick = async () => {
+        if (!confirm("Reset jog target to default pose?")) return;
+        try { await postJoystickReset(); } catch(e){ alert("Reset failed: " + e.message); }
+      };
+
       // ---------- status polling ----------
+      function setScannerText(running){
+        const t = running ? "RUNNING" : "OFF";
+        $("scannerText").textContent = t;
+        $("scannerText2").textContent = t;
+      }
+
       async function refreshStatus(){
         try{
           const res = await fetch("/api/status", { cache: "no-store" });
@@ -509,6 +552,21 @@
           $("countText").textContent = (s.sort_count ?? "--");
           $("errText").textContent = s.last_error ?? "--";
           $("serverTime").textContent = s.server_time ?? "--";
+
+          const running = !!s.scanner_running;
+          setScannerText(running);
+
+          if (Number.isFinite(Number(s.joy_speed))) joySpeed = Number(s.joy_speed);
+
+          if (s.joy_target && typeof s.joy_target === "object"){
+            const x = Number(s.joy_target.x);
+            const y = Number(s.joy_target.y);
+            const z = Number(s.joy_target.z);
+            if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
+              $("jogText").textContent = `${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`;
+            }
+          }
+
         }catch(e){
           setConn(false);
         }
