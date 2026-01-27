@@ -2,35 +2,24 @@ import cv2
 import numpy as np
 from final_testing.coordinatelogic import pixel_to_robot, detect_color
 
-# =====================================================
-# ROI (WEBSITE OVERLAY DETECTION AREA)
-# Edit these to make ROI bigger/smaller
-# =====================================================
+# =========================
+# ROI (TUNE THESE)
+# Bigger ROI: decrease X0/Y0, increase X1/Y1
+# =========================
 ROI_X0_FRAC = 0.12
 ROI_X1_FRAC = 0.88
 ROI_Y0_FRAC = 0.03
 ROI_Y1_FRAC = 0.75
 
-ROI_DRAW_BOX = True          # draw the ROI rectangle on the stream
-ROI_MASK_DISPLAY = False     # if True, black out everything outside ROI (visual only)
-SKIP_TOUCHING_BORDER = True  # helps ignore partial junk touching ROI edges
-BORDER_PX = 2
+ROI_DRAW_BOX = True
+ROI_MASK_DISPLAY = False   # visual only (does not affect detection)
 
-# =====================================================
-# Smoothing (DISPLAY ONLY)
-# Keep these module-level so smoothing persists across frames
-# =====================================================
-X_history = []
-Y_history = []
-angle_history = []
-SMOOTH_N = 5
+MIN_AREA = 400
+MAX_AREA = 20000
 
-
-def smooth(val, history):
-    history.append(val)
-    if len(history) > SMOOTH_N:
-        history.pop(0)
-    return sum(history) / len(history)
+# Clean-up to stabilize contours under changing lighting
+MORPH_ON = True
+MORPH_KERNEL = (3, 3)
 
 
 def _roi_bounds(frame):
@@ -48,30 +37,27 @@ def _roi_bounds(frame):
 
 
 def annotate_frame(frame):
-    """
-    Takes a BGR frame (numpy array), draws overlays on it, and returns it.
-    No camera access, no imshow, no infinite loop.
-    """
     if frame is None:
         return frame
 
-    x0, y0, x1, y1 = _roi_bounds(frame)
+    # Use a clean source for detection, draw on a separate output
+    src = frame
+    out = frame.copy()
 
-    # Optional: visually hide everything outside ROI (does NOT affect mapping)
+    x0, y0, x1, y1 = _roi_bounds(src)
+
+    # Optional: visually hide outside ROI on the stream
     if ROI_MASK_DISPLAY:
-        masked = np.zeros_like(frame)
-        masked[y0:y1, x0:x1] = frame[y0:y1, x0:x1]
-        frame = masked
+        masked = np.zeros_like(out)
+        masked[y0:y1, x0:x1] = out[y0:y1, x0:x1]
+        out = masked
 
-    if ROI_DRAW_BOX:
-        cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 255, 255), 2)
-        cv2.putText(
-            frame, "DETECTION ROI", (x0, max(20, y0 - 10)),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2
-        )
+    # --- DETECT ONLY INSIDE ROI (crop for detection stability) ---
+    work = src[y0:y1, x0:x1]
+    if work.size == 0:
+        return out
 
-    # --- Build threshold from full frame (then ROI-mask it) ---
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(work, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
     thresh = cv2.adaptiveThreshold(
@@ -81,79 +67,70 @@ def annotate_frame(frame):
         25, 5
     )
 
-    # ROI mask on the binary image BEFORE findContours (hard filter)
-    roi_mask = np.zeros_like(thresh)
-    roi_mask[y0:y1, x0:x1] = 255
-    thresh = cv2.bitwise_and(thresh, roi_mask)
+    if MORPH_ON:
+        k = cv2.getStructuringElement(cv2.MORPH_RECT, MORPH_KERNEL)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, k, iterations=1)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, k, iterations=1)
 
-    contours, _ = cv2.findContours(
-        thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     for c in contours:
         area = cv2.contourArea(c)
-        if area < 400 or area > 20000:
+        if area < MIN_AREA or area > MAX_AREA:
             continue
 
-        # Reject partial junk touching ROI border
-        if SKIP_TOUCHING_BORDER:
-            bx, by, bw, bh = cv2.boundingRect(c)
-            if bx <= x0 + BORDER_PX or by <= y0 + BORDER_PX or (bx + bw) >= x1 - BORDER_PX or (by + bh) >= y1 - BORDER_PX:
-                continue
-
         rect = cv2.minAreaRect(c)
-        (cx, cy), (w, h), angle = rect
+        (cx, cy), (rw, rh), angle = rect
 
-        if h > w:
+        if rh > rw:
             angle += 90
         angle = angle % 180
 
-        angle_raw = angle
-        angle = smooth(angle_raw, angle_history)
+        # ROI-local -> full-frame pixels
+        cx_full = float(cx + x0)
+        cy_full = float(cy + y0)
 
+        # Draw rotated box (offset ROI)
         box = cv2.boxPoints(rect)
         box = np.int32(box)
-        cv2.drawContours(frame, [box], 0, (0, 255, 0), 2)
+        box[:, 0] += x0
+        box[:, 1] += y0
+        cv2.drawContours(out, [box], 0, (0, 255, 0), 2)
 
-        # Bounding box + color (shrink ROI to reduce background influence)
-        x, y, bw, bh = cv2.boundingRect(c)
+        # Bounding box for text + color ROI (offset ROI)
+        bx, by, bw, bh = cv2.boundingRect(c)
+        bx_full = bx + x0
+        by_full = by + y0
+
         pad = int(min(bw, bh) * 0.08)
         pad = max(2, min(pad, 6))
 
         color = detect_color(
-            frame,
-            x + pad,
-            y + pad,
+            src,
+            bx_full + pad,
+            by_full + pad,
             max(1, bw - 2 * pad),
             max(1, bh - 2 * pad),
         )
 
-        # RAW coordinate from full-frame pixels (homography stays valid)
-        Xr_raw, Yr_raw = pixel_to_robot(cx, cy)
+        Xr, Yr = pixel_to_robot(cx_full, cy_full)
 
-        # SMOOTHED (display only)
-        Xr = smooth(Xr_raw, X_history)
-        Yr = smooth(Yr_raw, Y_history)
+        cv2.putText(out, f"({Xr:.1f}, {Yr:.1f})",
+                    (bx_full, max(20, by_full - 10)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
 
-        cv2.putText(
-            frame, f"({Xr:.1f}, {Yr:.1f})",
-            (x, max(20, y - 10)),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-            (255, 255, 0), 1
-        )
+        cv2.putText(out, f"Angle {angle:.1f}",
+                    (bx_full, by_full + 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
-        cv2.putText(
-            frame, f"Angle {angle:.1f}",
-            (x, y + 15),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-            (0, 255, 255), 1
-        )
+        cv2.putText(out, f"{color}",
+                    (bx_full, by_full + 35),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-        cv2.putText(
-            frame, f"{color}",
-            (x, y + 35),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-            (0, 255, 0), 1
-        )
+    # Draw ROI box LAST (so it never affects thresholding)
+    if ROI_DRAW_BOX:
+        cv2.rectangle(out, (x0, y0), (x1, y1), (0, 255, 255), 2)
+        cv2.putText(out, "DETECTION ROI", (x0, max(20, y0 - 10)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-    return frame
+    return out
