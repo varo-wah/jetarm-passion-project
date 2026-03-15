@@ -16,8 +16,8 @@ class DepthViewer(Node):
         self.depth_image_mm = None
         self.clicked_point = None
 
-        self.depth_topic = '/depth_cam/depth/image_raw'
-        self.camera_info_topic = '/depth_cam/depth/camera_info'
+        self.depth_topic = '/camera/depth/image_raw'
+        self.camera_info_topic = '/camera/depth/camera_info'
 
         self.fx = None
         self.fy = None
