@@ -205,6 +205,10 @@ class UserFriendlyMode:
         self.gripper.turn_wrist(90)
         self.gripper.open_gripper()
 
+    def idle_mode(self):
+        self.Arm.moveJetArm(3, 500)
+
+
 
 ik = JetArmIK()
 gripper = JetArmGripper(ik)
