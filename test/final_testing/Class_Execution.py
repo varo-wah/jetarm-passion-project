@@ -137,6 +137,16 @@ class JetArmIK:
         return self._apply_pulses(base_angle, L1_angle, L2_angle, L3_angle, x, y, z_wrist)
 
     def move_to(self, x, y, z_table):
+        global PAUSED, ESTOP_LATCHED
+
+        if ESTOP_LATCHED:
+            print("🛑 E-STOP active: motion blocked")
+            return False
+
+        if PAUSED:
+            print("⏸️ Paused: motion blocked")
+            return False
+
         # New default behavior: table-referenced tip height
         z_wrist = self._z_table_to_wrist(x, y, z_table)
         return self.move_to_wrist(x, y, z_wrist)
@@ -200,6 +210,45 @@ ik = JetArmIK()
 gripper = JetArmGripper(ik)
 camera = ComputerVision(ik, gripper)
 ufm = UserFriendlyMode(ik, gripper, camera)
+
+# -----------------------------
+# UI control latches
+# -----------------------------
+PAUSED = False
+ESTOP_LATCHED = False
+
+def pause_system() -> bool:
+    global PAUSED
+    PAUSED = True
+    print("⏸️ PAUSED")
+    return True
+
+def resume_system() -> bool:
+    global PAUSED
+    # do not resume if estop is latched
+    if ESTOP_LATCHED:
+        print("❌ Cannot resume: E-STOP is latched")
+        return False
+    PAUSED = False
+    print("▶️ RESUMED")
+    return True
+
+def stop_motion() -> bool:
+    # Soft stop = pause
+    return pause_system()
+
+def estop_motion() -> bool:
+    global ESTOP_LATCHED, PAUSED
+    ESTOP_LATCHED = True
+    PAUSED = True
+    print("🛑 E-STOP LATCHED (software) — motion should halt at loop level")
+    return True
+
+def clear_estop() -> bool:
+    global ESTOP_LATCHED
+    ESTOP_LATCHED = False
+    print("✅ E-STOP CLEARED")
+    return True
 
 if __name__ == "__main__":
     while True:

@@ -7,18 +7,24 @@ import cv2
 import time
 from coordinatelogic import detect_bricks
 from Class_Execution import ik, gripper, camera
+import os
+import numpy as np
+import requests
+
+UI_SERVER = os.environ.get("UI_SERVER", "http://127.0.0.1:8000")
+FRAME_URL = f"{UI_SERVER}/api/frame.jpg"
 
 # =========================
 # SETTINGS (EDIT THESE)
 # =========================
-NEUTRAL_BUCKET_X, NEUTRAL_BUCKET_Y = 20, 0
-RED_BUCKET_X, RED_BUCKET_Y = 20, -10
-BLUE_BUCKET_X, BLUE_BUCKET_Y = -20, -10
-GREEN_BUCKET_X, GREEN_BUCKET_Y = -20, 0
-APPROACH_Z = 15
-APPROACH_BUCKET = 18
-PICK_Z = 10
-DROP_Z = 15
+NEUTRAL_BUCKET_X, NEUTRAL_BUCKET_Y = 15, -8
+RED_BUCKET_X, RED_BUCKET_Y = -15, -8
+BLUE_BUCKET_X, BLUE_BUCKET_Y = 15, 3
+GREEN_BUCKET_X, GREEN_BUCKET_Y = -15, 3
+APPROACH_Z = 7.0
+APPROACH_BUCKET = 13.0
+PICK_Z = 3.0
+DROP_Z = 10.0
 
 MAX_PICKS = 50
 
@@ -60,9 +66,24 @@ def print_bricks(bricks):
 # CAMERA
 # =========================
 def take_snapshot():
-    cap = cv2.VideoCapture(CAM_INDEX)
+    """
+    If UI server is running, fetch latest frame from it.
+    Falls back to direct camera capture if UI is not reachable.
+    """
+    # 1) Try UI server first (preferred)
+    try:
+        r = requests.get(FRAME_URL, timeout=1.0)
+        if r.status_code == 200:
+            data = np.frombuffer(r.content, dtype=np.uint8)
+            frame = cv2.imdecode(data, cv2.IMREAD_COLOR)
+            if frame is None:
+                raise RuntimeError("UI returned invalid JPEG")
+            return frame
+    except Exception:
+        pass  # fallback below
 
-    # Warm up exposure/autofocus
+    # 2) Fallback: direct camera (use only if UI is off)
+    cap = cv2.VideoCapture(CAM_INDEX)
     for _ in range(WARMUP_FRAMES):
         cap.read()
 
@@ -162,7 +183,7 @@ def pick_and_drop(brick):
         return False
 
     # EXTRA) GO TO SCAN POSITION
-    ik.move_to(0, 15, 23)
+    ik.move_to(0, 13, 14)
     time.sleep(GRIP_SETTLE)
 
     # 7) Move to bucket (approach)
@@ -172,19 +193,12 @@ def pick_and_drop(brick):
         time.sleep(RELEASE_SETTLE)
         return False
 
-    # 8) Drop down
-    if not move_wait(bx, by, DROP_Z, "⬇️ DROP DOWN"):
-        print("⚠️ Bucket drop unreachable — releasing for safety")
-        gripper.open_gripper()
-        time.sleep(RELEASE_SETTLE)
-        return False
-
     # 9) Release + lift off
     print("🖐️ RELEASE      • opening gripper")
     gripper.open_gripper()
     time.sleep(RELEASE_SETTLE)
 
-    ik.move_to(bx, by, APPROACH_Z)
+    ik.move_to(bx, by, APPROACH_BUCKET)
     time.sleep(MOVE_TIME + SETTLE_TIME)
 
     return True
