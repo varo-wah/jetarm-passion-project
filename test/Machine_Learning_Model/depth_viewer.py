@@ -29,7 +29,7 @@ class DepthViewer(Node):
         self.pointcloud_window_name = 'Depth Viewer 3D'
         self.point_stride = 4
         self.max_points = 18000
-        self.max_depth_m = 4.0
+        self.max_depth_m = 1.0
         self.viewer_width = 1280
         self.viewer_height = 720
 
@@ -174,7 +174,7 @@ class DepthViewer(Node):
         return fx, fy, cx, cy
 
     def create_depth_preview(self, depth_mm):
-        valid_mask = (depth_mm > 0)
+        valid_mask = (depth_mm > 0) & (depth_mm <= self.max_depth_m * 1000.0)
 
         if np.any(valid_mask):
             valid_depth = depth_mm[valid_mask]
