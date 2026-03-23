@@ -16,7 +16,7 @@ from ui_server.camera_worker import get_latest_frame_copy, start_camera
 from ui_server.viewer_overlay import annotate_frame
 
 # Robot control (manual moves/gripper/home)
-from final_testing.Class_Execution import (
+from exhibition_phase.Class_Execution import (
     ik, gripper, camera,
     stop_motion, estop_motion,
     pause_system, resume_system
@@ -107,7 +107,7 @@ _status = {
 }
 
 _scanner_proc: subprocess.Popen | None = None
-SCANNER_PATH = Path(__file__).resolve().parents[1] / "final_testing" / "Vision_Scanner.py"
+SCANNER_PATH = Path(__file__).resolve().parents[1] / "exhibition_phase" / "Vision_Scanner.py"
 
 
 @app.post("/api/joystick")
