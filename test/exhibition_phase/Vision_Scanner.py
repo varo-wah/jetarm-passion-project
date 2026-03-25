@@ -1,7 +1,7 @@
 # Vision_Scanner_updated.py
 # ------------------------------------------------------------
 # Scan → pick 1 → drop → rescan (repeat)
-# Blue / Black bucket drop now uses direct servo positions
+# Blue / Neutral bucket drop now uses final direct servo poses
 # instead of inverse kinematics.
 # ------------------------------------------------------------
 
@@ -36,7 +36,7 @@ SETTLE_TIME = 0.15
 SCAN_SETTLE = 0.6
 WRIST_SETTLE = 0.5
 GRIP_SETTLE = 1.00
-RELEASE_SETTLE = 0.35
+RELEASE_SETTLE = 1.00
 SERVO_STEP_DELAY = 0.25
 
 CAM_INDEX = 0
@@ -45,40 +45,23 @@ WARMUP_FRAMES = 5
 # =========================
 # DIRECT SERVO DROP POSES
 # Final tracked positions from your manual testing:
-# BLUE  = s1=340, s2=550, s3=159, s4=260
-# BLACK = s1=230, s2=575, s3=200, s4=130
+# BLUE    = s1=310, s2=415, s4=150
+# NEUTRAL = s1=220, s2=430, s3=350, s4=60
+# Note: blue keeps servo 3 at the home position.
 # =========================
-BLUE_DROP_SEQUENCE = [
-    (4, 250),
-    (1, 350),
-    (2, 530),
-    (2, 550),
-    (1, 345),
-    (1, 340),
-    (4, 260),
-]
+BLUE_DROP_POSE = {
+    1: 310,
+    2: 415,
+    3: 350,
+    4: 170,
+}
 
-BLACK_DROP_SEQUENCE = [
-    (4, 250),
-    (1, 350),
-    (2, 530),
-    (2, 550),
-    (1, 345),
-    (1, 340),
-    (4, 260),
-    (1, 150),
-    (1, 200),
-    (1, 215),
-    (3, 170),
-    (3, 200),
-    (4, 100),
-    (4, 150),
-    (2, 575),
-    (4, 60),
-    (4, 90),
-    (4, 130),
-    (1, 230),
-]
+NEUTRAL_DROP_POSE = {
+    1: 220,
+    2: 430,
+    3: 350,
+    4: 120,
+}
 
 
 # =========================
@@ -169,27 +152,22 @@ def servo_move_wait(servo_id, position, delay=SERVO_STEP_DELAY):
     time.sleep(delay)
 
 
-def run_servo_sequence(sequence, label):
-    stage(label, "• Using direct Arm.moveJetArm() drop sequence")
-    for servo_id, position in sequence:
+def run_drop_pose(pose, label):
+    stage(label, "• Using final direct Arm.moveJetArm() pose")
+    for servo_id in (4, 3, 2, 1):
+        if servo_id not in pose:
+            continue
+        position = pose[servo_id]
         print(f"• Servo {servo_id} -> {position}")
         servo_move_wait(servo_id, position)
-
+    return True
 
 def go_to_blue_box_servo():
-    stage("🪣 TO BLUE BUCKET", "• Using manual servo path")
-    if not move_wait(5, 8, 12, "📍 BLUE STAGING POSE"):
-        return False
-    run_servo_sequence(BLUE_DROP_SEQUENCE, "🔵 BLUE DROP SEQUENCE")
-    return True
+    return run_drop_pose(BLUE_DROP_POSE, "🪣 TO BLUE BUCKET")
 
 
-def go_to_black_box_servo():
-    stage("🪣 TO BLACK BUCKET", "• Using manual servo path")
-    if not move_wait(5, 8, 12, "📍 BLACK STAGING POSE"):
-        return False
-    run_servo_sequence(BLACK_DROP_SEQUENCE, "⚫ BLACK DROP SEQUENCE")
-    return True
+def go_to_neutral_box_servo():
+    return run_drop_pose(NEUTRAL_DROP_POSE, "🪣 TO NEUTRAL BUCKET")
 
 
 # =========================
@@ -260,19 +238,21 @@ def pick_and_drop(brick):
             return False
 
         print("🖐️ RELEASE      • opening gripper")
+        time.sleep(RELEASE_SETTLE)
         gripper.open_gripper()
         time.sleep(RELEASE_SETTLE)
         return True
 
     if color in ("BLACK", "NEUTRAL"):
-        ok = go_to_black_box_servo()
+        ok = go_to_neutral_box_servo()
         if not ok:
-            print("⚠️ Black bucket path failed — releasing for safety")
+            print("⚠️ Neutral bucket path failed — releasing for safety")
+            time.sleep(RELEASE_SETTLE)
             gripper.open_gripper()
             time.sleep(RELEASE_SETTLE)
             return False
-
         print("🖐️ RELEASE      • opening gripper")
+        time.sleep(RELEASE_SETTLE)
         gripper.open_gripper()
         time.sleep(RELEASE_SETTLE)
         return True
