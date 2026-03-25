@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from final_testing.coordinatelogic import pixel_to_robot, detect_color
+from exhibition_phase.coordinatelogic import pixel_to_robot, detect_color
 
 # =========================
 # ROI (TUNE THESE)

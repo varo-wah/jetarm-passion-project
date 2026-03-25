@@ -9,7 +9,7 @@ import numpy as np  # L005
 # =====================================================  # L009
 
 # Calibration folder (contains homography_sheet.npy and affine_sheet_to_robot.npy)  # L011
-BASE = os.path.expanduser("/home/ubuntu/jetarm-passion-project/test/Vision/Vision testing")  # L012
+BASE = os.path.expanduser("/home/ubuntu/jetarm-passion-project/test/exhibition_testing/Vision/Vision testing")  # L012
 
 HOMOGRAPHY_FILE = "homography_sheet.npy"  # L014
 AFFINE_FILE = "affine_sheet_to_robot.npy"  # L015
