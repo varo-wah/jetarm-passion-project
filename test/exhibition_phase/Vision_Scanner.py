@@ -1,12 +1,14 @@
-# Vision_Scanner.py
+# Vision_Scanner_updated.py
 # ------------------------------------------------------------
 # Scan → pick 1 → drop → rescan (repeat)
+# Blue / Black bucket drop now uses direct servo positions
+# instead of inverse kinematics.
 # ------------------------------------------------------------
 
 import cv2
 import time
 from coordinatelogic import detect_bricks
-from Class_Execution import ik, gripper, camera
+from Class_Execution import ik, gripper, camera, Arm
 import os
 import numpy as np
 import requests
@@ -29,16 +31,54 @@ DROP_Z = 10.0
 MAX_PICKS = 50
 
 # Timing (important: prevents command spam / "glitching")
-# Tune MOVE_TIME to match your servo motion duration (often ~1.0s).
 MOVE_TIME = 1.0
 SETTLE_TIME = 0.15
 SCAN_SETTLE = 0.6
 WRIST_SETTLE = 0.5
 GRIP_SETTLE = 1.00
 RELEASE_SETTLE = 0.35
+SERVO_STEP_DELAY = 0.25
 
 CAM_INDEX = 0
 WARMUP_FRAMES = 5
+
+# =========================
+# DIRECT SERVO DROP POSES
+# Final tracked positions from your manual testing:
+# BLUE  = s1=340, s2=550, s3=159, s4=260
+# BLACK = s1=230, s2=575, s3=200, s4=130
+# =========================
+BLUE_DROP_SEQUENCE = [
+    (4, 250),
+    (1, 350),
+    (2, 530),
+    (2, 550),
+    (1, 345),
+    (1, 340),
+    (4, 260),
+]
+
+BLACK_DROP_SEQUENCE = [
+    (4, 250),
+    (1, 350),
+    (2, 530),
+    (2, 550),
+    (1, 345),
+    (1, 340),
+    (4, 260),
+    (1, 150),
+    (1, 200),
+    (1, 215),
+    (3, 170),
+    (3, 200),
+    (4, 100),
+    (4, 150),
+    (2, 575),
+    (4, 60),
+    (4, 90),
+    (4, 130),
+    (1, 230),
+]
 
 
 # =========================
@@ -47,12 +87,14 @@ WARMUP_FRAMES = 5
 def bar(char="-", n=52):
     print(char * n)
 
+
 def stage(title, detail=""):
     print("\n" + "-" * 52)
     print(title)
     if detail:
         print(detail)
     print("-" * 52)
+
 
 def print_bricks(bricks):
     print("\n" + "=" * 52)
@@ -70,7 +112,6 @@ def take_snapshot():
     If UI server is running, fetch latest frame from it.
     Falls back to direct camera capture if UI is not reachable.
     """
-    # 1) Try UI server first (preferred)
     try:
         r = requests.get(FRAME_URL, timeout=1.0)
         if r.status_code == 200:
@@ -80,9 +121,8 @@ def take_snapshot():
                 raise RuntimeError("UI returned invalid JPEG")
             return frame
     except Exception:
-        pass  # fallback below
+        pass
 
-    # 2) Fallback: direct camera (use only if UI is off)
     cap = cv2.VideoCapture(CAM_INDEX)
     for _ in range(WARMUP_FRAMES):
         cap.read()
@@ -109,7 +149,6 @@ def bucket_for_color(color):
     if color == "BLUE":
         return BLUE_BUCKET_X, BLUE_BUCKET_Y
 
-    # fallback
     return NEUTRAL_BUCKET_X, NEUTRAL_BUCKET_Y
 
 
@@ -123,6 +162,34 @@ def move_wait(x, y, z, label):
     if not ok:
         print("⏭ Skipping (unreachable / joint limit)")
     return ok
+
+
+def servo_move_wait(servo_id, position, delay=SERVO_STEP_DELAY):
+    Arm.moveJetArm(servo_id, position)
+    time.sleep(delay)
+
+
+def run_servo_sequence(sequence, label):
+    stage(label, "• Using direct Arm.moveJetArm() drop sequence")
+    for servo_id, position in sequence:
+        print(f"• Servo {servo_id} -> {position}")
+        servo_move_wait(servo_id, position)
+
+
+def go_to_blue_box_servo():
+    stage("🪣 TO BLUE BUCKET", "• Using manual servo path")
+    if not move_wait(5, 8, 12, "📍 BLUE STAGING POSE"):
+        return False
+    run_servo_sequence(BLUE_DROP_SEQUENCE, "🔵 BLUE DROP SEQUENCE")
+    return True
+
+
+def go_to_black_box_servo():
+    stage("🪣 TO BLACK BUCKET", "• Using manual servo path")
+    if not move_wait(5, 8, 12, "📍 BLACK STAGING POSE"):
+        return False
+    run_servo_sequence(BLACK_DROP_SEQUENCE, "⚫ BLACK DROP SEQUENCE")
+    return True
 
 
 # =========================
@@ -140,8 +207,8 @@ def scan_once():
     return bricks
 
 
+
 def choose_brick(bricks):
-    # Closest to origin tends to be most reachable
     return min(bricks, key=lambda b: (b["x"] ** 2 + b["y"] ** 2))
 
 
@@ -152,48 +219,70 @@ def pick_and_drop(brick):
     x = brick["x"]
     y = brick["y"]
     angle = brick["angle"]
-    bx, by = bucket_for_color(brick.get("color"))
+    color = (brick.get("color") or "NEUTRAL").upper()
+    bx, by = bucket_for_color(color)
 
     stage("🎯 SELECTED BRICK",
-          f"• x={x:.2f}, y={y:.2f}, angle={angle:.1f}, color={brick['color']}")
+          f"• x={x:.2f}, y={y:.2f}, angle={angle:.1f}, color={color}")
 
-    # 1) Approach above brick
     if not move_wait(x, y, APPROACH_Z, "🚀 APPROACHING"):
         return False
 
-    # 2) Wrist align
     print(f"🧭 ALIGN WRIST  • target angle={angle:.1f}°")
     gripper.turn_wrist(angle)
     time.sleep(WRIST_SETTLE)
 
-    # 3) Go down to pick
     if not move_wait(x, y, PICK_Z, "⬇️ GOING DOWN"):
         return False
 
-    # 4) Grip
     print("✊ GRIP         • closing gripper")
     gripper.close_gripper()
     time.sleep(GRIP_SETTLE)
 
-    # 5) Lift back up
     if not move_wait(x, y, APPROACH_Z, "⬆️ LIFTING UP"):
         print("⚠️ Lift failed after grip — opening gripper for safety")
         gripper.open_gripper()
         time.sleep(RELEASE_SETTLE)
         return False
 
-    # EXTRA) GO TO SCAN POSITION
-    ik.move_to(0, 13, 14)
-    time.sleep(GRIP_SETTLE)
+    if not move_wait(0, 13, 14, "🔄 RETURNING TO CENTER"):
+        print("⚠️ Could not return to center — opening gripper for safety")
+        gripper.open_gripper()
+        time.sleep(RELEASE_SETTLE)
+        return False
 
-    # 7) Move to bucket (approach)
-    if not move_wait(bx, by, APPROACH_BUCKET, f"🪣 TO {brick.get('color', 'NEUTRAL')} BUCKET"):
+    if color == "BLUE":
+        ok = go_to_blue_box_servo()
+        if not ok:
+            print("⚠️ Blue bucket path failed — releasing for safety")
+            gripper.open_gripper()
+            time.sleep(RELEASE_SETTLE)
+            return False
+
+        print("🖐️ RELEASE      • opening gripper")
+        gripper.open_gripper()
+        time.sleep(RELEASE_SETTLE)
+        return True
+
+    if color in ("BLACK", "NEUTRAL"):
+        ok = go_to_black_box_servo()
+        if not ok:
+            print("⚠️ Black bucket path failed — releasing for safety")
+            gripper.open_gripper()
+            time.sleep(RELEASE_SETTLE)
+            return False
+
+        print("🖐️ RELEASE      • opening gripper")
+        gripper.open_gripper()
+        time.sleep(RELEASE_SETTLE)
+        return True
+
+    if not move_wait(bx, by, APPROACH_BUCKET, f"🪣 TO {color} BUCKET"):
         print("⚠️ Bucket approach unreachable — releasing for safety")
         gripper.open_gripper()
         time.sleep(RELEASE_SETTLE)
         return False
 
-    # 9) Release + lift off
     print("🖐️ RELEASE      • opening gripper")
     gripper.open_gripper()
     time.sleep(RELEASE_SETTLE)
