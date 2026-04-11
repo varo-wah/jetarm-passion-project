@@ -11,8 +11,8 @@ Y_history = []
 angle_history = []
 ROI_X0_FRAC = 0.12
 ROI_X1_FRAC = 0.88
-ROI_Y0_FRAC = 0.03
-ROI_Y1_FRAC = 0.75
+ROI_Y0_FRAC = 0.15
+ROI_Y1_FRAC = 0.85
 SMOOTH_N = 5
 
 def smooth(val, history):
