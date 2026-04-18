@@ -1,43 +1,87 @@
-# detect.py
-
 from ultralytics import YOLO
 import cv2
 
-# ===== LOAD MODEL =====
-model = YOLO("../models/yolov8n.pt")  # adjust if needed
 
-# ===== START CAMERA =====
-cap = cv2.VideoCapture(0)
+def load_model():
+    # Try local path from repo root first
+    try:
+        return YOLO("models/yolov8n.pt")
+    except Exception:
+        # Fallback when run from inside inference/
+        return YOLO("../models/yolov8n.pt")
 
-if not cap.isOpened():
-    print("Error: Cannot access camera")
-    exit()
 
-print("Starting YOLO live detection... Press 'q' to quit.")
+def extract_detections(result):
+    detections = []
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
-
-    # ===== RUN YOLO =====
-    results = model(frame)
-
-    # ===== DRAW RESULTS =====
-    annotated_frame = results[0].plot()
-
-    # ===== SHOW =====
-    cv2.imshow("YOLO Detection", annotated_frame)
-
-    # ===== PRINT DETECTIONS (for debugging) =====
-    for box in results[0].boxes:
-        cls = int(box.cls[0])
+    for box in result.boxes:
+        cls_id = int(box.cls[0])
         conf = float(box.conf[0])
-        print(f"Detected class {cls} with confidence {conf:.2f}")
 
-    # ===== EXIT KEY =====
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+        x1, y1, x2, y2 = box.xyxy[0]
+        x1, y1, x2, y2 = float(x1), float(y1), float(x2), float(y2)
 
-cap.release()
-cv2.destroyAllWindows()
+        center_x = int((x1 + x2) / 2)
+        center_y = int((y1 + y2) / 2)
+
+        detections.append({
+            "class_id": cls_id,
+            "confidence": round(conf, 2),
+            "center_x": center_x,
+            "center_y": center_y,
+            "x1": int(x1),
+            "y1": int(y1),
+            "x2": int(x2),
+            "y2": int(y2),
+        })
+
+    return detections
+
+
+def main():
+    model = load_model()
+    cap = cv2.VideoCapture(0)
+
+    if not cap.isOpened():
+        print("Error: Cannot access camera")
+        return
+
+    print("Starting YOLO live detection... Press 'q' to quit.")
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Failed to read frame from camera")
+            break
+
+        results = model(frame, verbose=False)
+        result = results[0]
+
+        detections = extract_detections(result)
+
+        annotated_frame = result.plot()
+
+        # Draw center points
+        for det in detections:
+            cv2.circle(
+                annotated_frame,
+                (det["center_x"], det["center_y"]),
+                5,
+                (0, 255, 255),
+                -1
+            )
+
+        cv2.imshow("YOLO Detection", annotated_frame)
+
+        if detections:
+            print(detections)
+
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
