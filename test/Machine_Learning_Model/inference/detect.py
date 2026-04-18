@@ -1,14 +1,20 @@
 from ultralytics import YOLO
 import cv2
+from pathlib import Path
 
 
 def load_model():
-    # Try local path from repo root first
-    try:
-        return YOLO("../models/yolov8n.pt")
-    except Exception:
-        # Fallback when run from inside inference/
-        return YOLO("models/yolov8n.pt")
+    candidate_paths = [
+        Path("../models/yolo11s.pt")
+    ]
+
+    for model_path in candidate_paths:
+        if model_path.exists():
+            print(f"Loading model from: {model_path}")
+            return YOLO(str(model_path))
+
+    print("No local YOLO model found. Downloading yolo11s.pt from Ultralytics...")
+    return YOLO("../models/yolo11s.pt")
 
 
 def extract_detections(result):
@@ -58,10 +64,8 @@ def main():
         result = results[0]
 
         detections = extract_detections(result)
-
         annotated_frame = result.plot()
 
-        # Draw center points
         for det in detections:
             cv2.circle(
                 annotated_frame,
