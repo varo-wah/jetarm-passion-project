@@ -5,10 +5,10 @@ import cv2
 def load_model():
     # Try local path from repo root first
     try:
-        return YOLO("models/yolov8n.pt")
+        return YOLO("../models/yolov8n.pt")
     except Exception:
         # Fallback when run from inside inference/
-        return YOLO("../models/yolov8n.pt")
+        return YOLO("models/yolov8n.pt")
 
 
 def extract_detections(result):
