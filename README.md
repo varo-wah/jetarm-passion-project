@@ -7,13 +7,11 @@ William Alvaro Hartono's passion project (AI Sorting Machine). An exploration of
 jetarm-passion-project/
 ├── src/jetarm/
 │   ├── config/      # constants, paths, robot/camera/vision/YOLO settings
-│   ├── hardware/    # ROS servo and arm/gripper control
-│   ├── kinematics/  # future IK/FK/joint-limit modules
+│   ├── hardware/    # ROS servo, arm/gripper control, and current IK logic
 │   ├── vision/      # runtime camera detection, scanner, YOLO inference
 │   ├── ml/          # YOLO training and dataset pipeline code
 │   ├── sorting/     # high-level sorting workflows
-│   ├── ui/          # FastAPI dashboard, video stream, overlays
-│   └── utils/       # shared helpers
+│   └── ui/          # FastAPI dashboard, video stream, overlays
 ├── scripts/         # manual demos, calibration, camera/model checks
 ├── tests/           # automated tests
 ├── data/            # datasets and calibration matrices
@@ -50,3 +48,5 @@ PYTHONPATH=src python3 scripts/run_viewer.py
 ```
 
 ROS 2 packages such as `rclpy`, `sensor_msgs`, `cv_bridge`, and `ros_robot_controller_msgs` must come from the JetArm ROS environment, not standard `pip`.
+
+For now, IK stays in `src/jetarm/hardware/arm_controller.py` because it is still tightly connected to servo pulse conversion and arm movement. Split it into a separate `kinematics.py` module only when it becomes independently testable.
