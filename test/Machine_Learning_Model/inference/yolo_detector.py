@@ -1,18 +1,21 @@
 """
 Reusable YOLO detector module for JetArm.
 
-This module:
-- Loads YOLO
-- Runs detection on one frame
-- Converts pixel center to robot coordinates
-- Estimates object angle using OpenCV inside the YOLO box
-- Chooses the best reachable target
+Responsibilities:
+- Load YOLO model once
+- Run YOLO inference on a provided frame
+- Extract structured detection data
+- Convert pixel center coordinates to robot coordinates
+- Estimate object angle inside the YOLO bounding box
+- Select the best reachable target
+- Provide old Vision_Scanner-compatible output
 
-It does NOT:
-- Open camera
-- Show OpenCV windows
-- Move robot
+Does NOT:
+- Open the camera
+- Display OpenCV windows
+- Move the robot
 - Import Class_Execution
+- Control servos or gripper
 """
 
 import sys
@@ -20,13 +23,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import cv2
-import numpy as np
 from ultralytics import YOLO
 
 
-# ------------------------------------------------------------
-# Path setup
-# ------------------------------------------------------------
+# ============================================================
+# 1. PATH SETUP
+# ============================================================
 
 CURRENT_FILE = Path(__file__).resolve()
 
@@ -43,17 +45,14 @@ if str(EXHIBITION_PHASE_DIR) not in sys.path:
 from coordinatelogic import pixel_to_robot  # noqa: E402
 
 
-# ------------------------------------------------------------
-# Global model cache
-# ------------------------------------------------------------
+# ============================================================
+# 2. MODEL CACHE
+# ============================================================
 
 _model = None
 
 
 def load_model():
-    """
-    Load YOLO model once and reuse it.
-    """
     global _model
 
     if _model is None:
@@ -67,44 +66,36 @@ def load_model():
     return _model
 
 
-def estimate_angle_from_crop(frame, x1, y1, x2, y2) -> Optional[float]:
-    """
-    Estimate object rotation angle from inside a YOLO bounding box.
+# ============================================================
+# 3. ANGLE ESTIMATION
+# ============================================================
 
-    YOLO finds the object.
-    OpenCV estimates the object's rotation.
+def estimate_angle_from_yolo_box(frame, x1, y1, x2, y2) -> float:
+    image_height, image_width = frame.shape[:2]
 
-    Args:
-        frame: Full OpenCV frame.
-        x1, y1, x2, y2: YOLO bounding box coordinates.
-
-    Returns:
-        float or None: Angle from 0 to 180 degrees.
-    """
-    height, width = frame.shape[:2]
-
-    x1 = max(0, min(x1, width - 1))
-    x2 = max(0, min(x2, width - 1))
-    y1 = max(0, min(y1, height - 1))
-    y2 = max(0, min(y2, height - 1))
+    x1 = max(0, min(int(x1), image_width - 1))
+    x2 = max(0, min(int(x2), image_width - 1))
+    y1 = max(0, min(int(y1), image_height - 1))
+    y2 = max(0, min(int(y2), image_height - 1))
 
     if x2 <= x1 or y2 <= y1:
-        return None
+        return 0.0
 
     crop = frame[y1:y2, x1:x2]
 
     if crop.size == 0:
-        return None
+        return 0.0
 
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-
-    _, threshold = cv2.threshold(
-        blurred,
-        0,
+    threshold = cv2.adaptiveThreshold(
+        blur,
         255,
-        cv2.THRESH_BINARY + cv2.THRESH_OTSU,
+        cv2.ADAPTIVE_THRESH_MEAN_C,
+        cv2.THRESH_BINARY_INV,
+        25,
+        5,
     )
 
     contours, _ = cv2.findContours(
@@ -114,20 +105,21 @@ def estimate_angle_from_crop(frame, x1, y1, x2, y2) -> Optional[float]:
     )
 
     if not contours:
-        return None
+        return 0.0
 
     largest_contour = max(contours, key=cv2.contourArea)
+    area = cv2.contourArea(largest_contour)
 
-    if cv2.contourArea(largest_contour) < 50:
-        return None
+    if area < 50:
+        return 0.0
 
     rect = cv2.minAreaRect(largest_contour)
-    (_, _), (w, h), angle = rect
+    (_, _), (rect_width, rect_height), angle = rect
 
-    if w <= 0 or h <= 0:
-        return None
+    if rect_width <= 0 or rect_height <= 0:
+        return 0.0
 
-    if h > w:
+    if rect_height > rect_width:
         angle += 90
 
     angle = angle % 180
@@ -135,10 +127,11 @@ def estimate_angle_from_crop(frame, x1, y1, x2, y2) -> Optional[float]:
     return round(float(angle), 1)
 
 
+# ============================================================
+# 4. YOLO RESULT EXTRACTION
+# ============================================================
+
 def extract_detections(frame, result) -> List[Dict[str, Any]]:
-    """
-    Convert YOLO result into structured detections.
-    """
     detections = []
 
     if result.boxes is None:
@@ -159,35 +152,33 @@ def extract_detections(frame, result) -> List[Dict[str, Any]]:
         center_y = int((y1 + y2) / 2)
 
         robot_x, robot_y = pixel_to_robot(center_x, center_y)
+        angle = estimate_angle_from_yolo_box(frame, x1, y1, x2, y2)
 
-        angle = estimate_angle_from_crop(frame, x1, y1, x2, y2)
-
-        detection = {
+        detections.append({
             "class_id": class_id,
-            "confidence": confidence,
+            "confidence": round(confidence, 2),
             "center_x": center_x,
             "center_y": center_y,
-            "robot_x": float(robot_x),
-            "robot_y": float(robot_y),
-            "angle": angle,
+            "robot_x": round(float(robot_x), 2),
+            "robot_y": round(float(robot_y), 2),
+            "angle": round(float(angle), 1),
             "x1": x1,
             "y1": y1,
             "x2": x2,
             "y2": y2,
-        }
-
-        detections.append(detection)
+        })
 
     return detections
 
+
+# ============================================================
+# 5. TARGET SELECTION
+# ============================================================
 
 def choose_target(
     detections: List[Dict[str, Any]],
     min_confidence: float = 0.40,
 ) -> Optional[Dict[str, Any]]:
-    """
-    Choose the highest-confidence reachable detection.
-    """
     valid_detections = []
 
     for detection in detections:
@@ -212,12 +203,12 @@ def choose_target(
     return max(valid_detections, key=lambda d: d["confidence"])
 
 
-def detect_objects(frame) -> List[Dict[str, Any]]:
-    """
-    Run YOLO detection on one provided frame.
-    """
-    model = load_model()
+# ============================================================
+# 6. PUBLIC DETECTION FUNCTIONS
+# ============================================================
 
+def detect_objects(frame) -> List[Dict[str, Any]]:
+    model = load_model()
     results = model(frame, imgsz=416, verbose=False)
 
     if not results:
@@ -227,87 +218,26 @@ def detect_objects(frame) -> List[Dict[str, Any]]:
 
 
 def detect_target(frame) -> Optional[Dict[str, Any]]:
-    """
-    Detect all objects and return the chosen target.
-    """
     detections = detect_objects(frame)
     return choose_target(detections)
 
 
-def to_vision_scanner_format(detection: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Convert YOLO detection into old Vision_Scanner.py style format.
+# ============================================================
+# 7. VISION_SCANNER COMPATIBILITY ADAPTER
+# ============================================================
 
-    Old format:
-    {
-        "x": robot_x,
-        "y": robot_y,
-        "angle": angle,
-        "color": color
-    }
-    """
-    return {
-        "x": detection["robot_x"],
-        "y": detection["robot_y"],
-        "angle": detection["angle"] if detection["angle"] is not None else 0.0,
-        "color": "YOLO",
-    }
-
-    def to_vision_scanner_format(detections):
-        """
-        Convert YOLO detections into the old coordinatelogic.detect_bricks(frame)
-        output format used by Vision_Scanner.py.
-
-        Old format:
-        [
-            {
-                "x": robot_x,
-                "y": robot_y,
-                "angle": angle,
-                "color": color
-            }
-        ]
-        """
-        bricks = []
-
-        for det in detections:
-            angle = det.get("angle")
-
-            if angle is None:
-                angle = 90.0
-
-            bricks.append({
-                "x": float(det["robot_x"]),
-                "y": float(det["robot_y"]),
-                "angle": float(angle),
-                "color": "YOLO",
-            })
-
-        return bricks
-
-
-    def detect_bricks_yolo(frame):
-        """
-        Bridge function that makes YOLO behave like the old detect_bricks(frame).
-
-        This allows future Vision_Scanner.py integration without changing the
-        expected brick data format.
-        """
-        detections = detect_objects(frame)
-        return to_vision_scanner_format(detections)
-        
-def to_vision_scanner_format(detections):
+def to_vision_scanner_format(detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     bricks = []
 
-    for det in detections:
-        angle = det.get("angle")
+    for detection in detections:
+        angle = detection.get("angle", 0.0)
 
         if angle is None:
-            angle = 90.0
+            angle = 0.0
 
         bricks.append({
-            "x": float(det["robot_x"]),
-            "y": float(det["robot_y"]),
+            "x": float(detection["robot_x"]),
+            "y": float(detection["robot_y"]),
             "angle": float(angle),
             "color": "YOLO",
         })
@@ -315,6 +245,6 @@ def to_vision_scanner_format(detections):
     return bricks
 
 
-def detect_bricks_yolo(frame):
+def detect_bricks_yolo(frame) -> List[Dict[str, Any]]:
     detections = detect_objects(frame)
     return to_vision_scanner_format(detections)
