@@ -1,7 +1,7 @@
 import cv2
 from ultralytics import YOLO
 
-MODEL_PATH = "models/yolov8n.pt"
+MODEL_PATH = "models/pretrained/yolov8n.pt"
 CONF = 0.5
 CAMERA_INDEX = 0
 

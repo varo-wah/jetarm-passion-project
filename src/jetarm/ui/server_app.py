@@ -13,14 +13,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 
 from jetarm.ui.camera_worker import get_latest_frame_copy, start_camera
-from jetarm.ui.viewer_overlay import annotate_frame
 
 # Robot control (manual moves/gripper/home)
-from jetarm.hardware.arm_controller import (
+from jetarm.hardware.Class_Execution import (
     ik, gripper, camera,
     stop_motion, estop_motion,
     pause_system, resume_system
 )
+from jetarm.ui.viewer_overlay import annotate_frame
 
 # -------------------------------------------------
 # Joystick / Jog state
@@ -107,7 +107,7 @@ _status = {
 }
 
 _scanner_proc: subprocess.Popen | None = None
-SCANNER_MODULE = "jetarm.vision.scanner"
+SCANNER_MODULE = "jetarm.vision.Vision_Scanner"
 
 
 @app.post("/api/joystick")
@@ -235,11 +235,11 @@ def scanner_start():
     # already running
     if _scanner_proc is not None and _scanner_proc.poll() is None:
         _status["last_action"] = "scanner_start"
-        return JSONResponse({"ok": True, "running": True, "note": "scanner already running"})
+        return JSONResponse({"ok": True, "running": True, "note": "Vision_Scanner already running"})
 
     env = os.environ.copy()
 
-    # Force scanner to use this server for frames to avoid camera conflicts.
+    # IMPORTANT: force Vision_Scanner to use THIS server for frames (no camera conflict)
     env["UI_SERVER"] = "http://127.0.0.1:8000"
 
     _scanner_proc = subprocess.Popen(
@@ -262,7 +262,7 @@ def scanner_stop():
         _scanner_proc = None
         _status["last_action"] = "scanner_stop"
         _status["state"] = "IDLE"
-        return JSONResponse({"ok": True, "running": False, "note": "scanner not running"})
+        return JSONResponse({"ok": True, "running": False, "note": "Vision_Scanner not running"})
 
     try:
         _scanner_proc.send_signal(signal.SIGINT)

@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from jetarm.vision.pixel_to_robot import detect_color, pixel_to_robot
+from jetarm.vision.coordinatelogic import detect_color, pixel_to_robot
 
 # =========================
 # ROI (TUNE THESE)
