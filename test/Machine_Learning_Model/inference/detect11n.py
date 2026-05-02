@@ -6,8 +6,9 @@
 # 2. Read live camera frames
 # 3. Run YOLO detection
 # 4. Extract bounding box center points
-# 5. Convert pixel center into robot coordinates
-# 6. Display detection + robot coordinate overlay
+# 5. Filter invalid boxes, such as full-table/background boxes
+# 6. Convert valid pixel centers into robot coordinates
+# 7. Display detection + robot coordinate overlay
 #
 # IMPORTANT:
 # This file does NOT move the robot.
@@ -24,8 +25,8 @@ from pathlib import Path
 # ============================================================
 # PATH SETUP
 # ------------------------------------------------------------
-# detect.py location:
-#   test/Machine_Learning_Model/inference/detect.py
+# detect11n.py location:
+#   test/Machine_Learning_Model/inference/detect11n.py
 #
 # PROJECT_ROOT points to:
 #   test/
@@ -40,7 +41,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EXHIBITION_PHASE = PROJECT_ROOT / "exhibition_phase"
 
-sys.path.append(str(EXHIBITION_PHASE))
+if str(EXHIBITION_PHASE) not in sys.path:
+    sys.path.append(str(EXHIBITION_PHASE))
 
 from coordinatelogic import pixel_to_robot
 
@@ -52,14 +54,23 @@ from coordinatelogic import pixel_to_robot
 MODEL_NAME = "yolo11n.pt"
 IMAGE_SIZE = 416
 CAMERA_INDEX = 0
-FRAME_DELAY = 0.03  # ~30 FPS cap; helps reduce CPU/RAM pressure
+FRAME_DELAY = 0.03
+
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 480
+CAMERA_FPS = 15
+
+MIN_BOX_AREA_RATIO = 0.002
+MAX_BOX_AREA_RATIO = 0.30
+BORDER_BOX_AREA_RATIO = 0.20
+BORDER_MARGIN_PX = 5
 
 
 # ============================================================
 # MODEL LOADING
 # ------------------------------------------------------------
 # Loads:
-#   Machine_Learning_Model/models/yolo11n.pt
+#   test/Machine_Learning_Model/models/yolo11n.pt
 # ============================================================
 
 def load_model():
@@ -75,6 +86,50 @@ def load_model():
 
 
 # ============================================================
+# BOX VALIDATION FILTER
+# ------------------------------------------------------------
+# Rejects:
+# - tiny noise boxes
+# - giant full-frame/table/background boxes
+# - large boxes touching the frame border
+#
+# This is a temporary debug filter.
+# The real long-term fix is custom YOLO training.
+# ============================================================
+
+def is_valid_box(det, frame_width, frame_height):
+    box_w = det["x2"] - det["x1"]
+    box_h = det["y2"] - det["y1"]
+
+    if box_w <= 0 or box_h <= 0:
+        return False
+
+    box_area = box_w * box_h
+    frame_area = frame_width * frame_height
+
+    min_area = frame_area * MIN_BOX_AREA_RATIO
+    max_area = frame_area * MAX_BOX_AREA_RATIO
+
+    if box_area < min_area:
+        return False
+
+    if box_area > max_area:
+        return False
+
+    touches_border = (
+        det["x1"] <= BORDER_MARGIN_PX or
+        det["y1"] <= BORDER_MARGIN_PX or
+        det["x2"] >= frame_width - BORDER_MARGIN_PX or
+        det["y2"] >= frame_height - BORDER_MARGIN_PX
+    )
+
+    if touches_border and box_area > frame_area * BORDER_BOX_AREA_RATIO:
+        return False
+
+    return True
+
+
+# ============================================================
 # DETECTION EXTRACTION
 # ------------------------------------------------------------
 # Converts YOLO raw boxes into dictionaries containing:
@@ -83,29 +138,30 @@ def load_model():
 # - pixel center
 # - robot coordinates
 # - bounding box corners
+#
+# Then filters out boxes that are probably background/table detections.
 # ============================================================
 
-def extract_detections(result):
+def extract_detections(result, frame_width, frame_height):
     detections = []
+    rejected = []
+
+    if result.boxes is None:
+        return detections, rejected
 
     for box in result.boxes:
         cls_id = int(box.cls[0])
         conf = float(box.conf[0])
 
-        # YOLO box format: x1, y1, x2, y2
-        # x1, y1 = top-left corner
-        # x2, y2 = bottom-right corner
         x1, y1, x2, y2 = box.xyxy[0]
         x1, y1, x2, y2 = float(x1), float(y1), float(x2), float(y2)
 
-        # Center point in image pixel coordinates
         center_x = int((x1 + x2) / 2)
         center_y = int((y1 + y2) / 2)
 
-        # Convert pixel center into robot coordinates using existing calibration
         robot_x, robot_y = pixel_to_robot(center_x, center_y)
 
-        detections.append({
+        detection = {
             "class_id": cls_id,
             "confidence": round(conf, 2),
 
@@ -119,26 +175,44 @@ def extract_detections(result):
             "y1": int(y1),
             "x2": int(x2),
             "y2": int(y2),
-        })
+        }
 
-    return detections
+        if is_valid_box(detection, frame_width, frame_height):
+            detections.append(detection)
+        else:
+            rejected.append(detection)
+
+    return detections, rejected
 
 
 # ============================================================
-# DRAW DEBUG OVERLAY
+# DRAW VALID DETECTION OVERLAY
 # ------------------------------------------------------------
 # Adds:
-# - yellow dot at center of each YOLO box
+# - green box around valid detection
+# - yellow dot at center
 # - pixel coordinate text
 # - robot coordinate text
 # ============================================================
 
-def draw_extra_info(frame, detections):
+def draw_valid_detections(frame, detections):
     for det in detections:
+        x1 = det["x1"]
+        y1 = det["y1"]
+        x2 = det["x2"]
+        y2 = det["y2"]
+
         cx = det["center_x"]
         cy = det["center_y"]
 
-        # Draw center point
+        cv2.rectangle(
+            frame,
+            (x1, y1),
+            (x2, y2),
+            (0, 255, 0),
+            2
+        )
+
         cv2.circle(
             frame,
             (cx, cy),
@@ -147,17 +221,50 @@ def draw_extra_info(frame, detections):
             -1
         )
 
-        # Coordinate text shown above detection box
-        text = f"px=({cx},{cy}) robot=({det['robot_x']},{det['robot_y']})"
+        text = (
+            f"ID:{det['class_id']} conf:{det['confidence']} "
+            f"px=({cx},{cy}) robot=({det['robot_x']},{det['robot_y']})"
+        )
 
         cv2.putText(
             frame,
             text,
-            (det["x1"], max(20, det["y1"] - 25)),
+            (x1, max(20, y1 - 10)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (0, 255, 255),
             2
+        )
+
+    return frame
+
+
+# ============================================================
+# DRAW REJECTED BOX OVERLAY
+# ------------------------------------------------------------
+# Optional visual debug:
+# - red boxes show detections rejected by the area/border filter
+# - useful for verifying that the bad full-table box is being removed
+# ============================================================
+
+def draw_rejected_detections(frame, rejected):
+    for det in rejected:
+        cv2.rectangle(
+            frame,
+            (det["x1"], det["y1"]),
+            (det["x2"], det["y2"]),
+            (0, 0, 255),
+            1
+        )
+
+        cv2.putText(
+            frame,
+            "REJECTED",
+            (det["x1"], max(20, det["y1"] - 10)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 255),
+            1
         )
 
     return frame
@@ -169,8 +276,9 @@ def draw_extra_info(frame, detections):
 # 1. Load YOLO11n
 # 2. Open camera
 # 3. Run live inference
-# 4. Draw YOLO + coordinate overlays
-# 5. Print detections in terminal
+# 4. Filter invalid boxes
+# 5. Draw overlays
+# 6. Print valid detections in terminal
 #
 # Press q to quit.
 # ============================================================
@@ -182,17 +290,18 @@ def main():
 
     cap = cv2.VideoCapture(CAMERA_INDEX)
 
-    # Reduce camera buffering / stale frames
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_FPS, 15)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+    cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
 
     if not cap.isOpened():
         print("Error: Cannot access camera")
         return
 
     print("Starting YOLO11n live detection... Press 'q' to quit.")
+    print("Green boxes = valid detections")
+    print("Red boxes = rejected detections")
 
     while True:
         ret, frame = cap.read()
@@ -201,25 +310,42 @@ def main():
             print("Error: Failed to read frame from camera")
             break
 
-        # Run YOLO inference at smaller image size for JetArm stability
+        frame_height, frame_width = frame.shape[:2]
+
         results = model(frame, imgsz=IMAGE_SIZE, verbose=False)
         result = results[0]
 
-        # Convert YOLO result into structured detection dictionaries
-        detections = extract_detections(result)
+        detections, rejected = extract_detections(
+            result,
+            frame_width,
+            frame_height
+        )
 
-        # YOLO default annotation: box + class + confidence
-        annotated_frame = result.plot()
+        debug_frame = frame.copy()
 
-        # Custom overlay: center point + robot coordinate
-        annotated_frame = draw_extra_info(annotated_frame, detections)
+        debug_frame = draw_valid_detections(debug_frame, detections)
+        debug_frame = draw_rejected_detections(debug_frame, rejected)
 
-        cv2.imshow("YOLO11n Detection", annotated_frame)
+        status_text = f"valid={len(detections)} rejected={len(rejected)}"
+
+        cv2.putText(
+            debug_frame,
+            status_text,
+            (20, 35),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (255, 255, 255),
+            2
+        )
+
+        cv2.imshow("YOLO11n Detection - Filtered", debug_frame)
 
         if detections:
-            print(detections)
+            print("VALID:", detections)
 
-        # FPS limit to reduce system load
+        if rejected:
+            print("REJECTED:", rejected)
+
         time.sleep(FRAME_DELAY)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
