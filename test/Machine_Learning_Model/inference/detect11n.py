@@ -51,7 +51,7 @@ from coordinatelogic import pixel_to_robot
 # CONFIG
 # ============================================================
 
-MODEL_NAME = "yolo11n.pt"
+MODEL_NAME = "lego_yolo11n.pt"
 IMAGE_SIZE = 416
 CAMERA_INDEX = 0
 FRAME_DELAY = 0.03

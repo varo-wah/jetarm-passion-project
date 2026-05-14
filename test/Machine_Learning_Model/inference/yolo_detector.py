@@ -36,7 +36,7 @@ INFERENCE_DIR = CURRENT_FILE.parent
 ML_DIR = INFERENCE_DIR.parent
 TEST_DIR = ML_DIR.parent
 
-MODEL_PATH = ML_DIR / "models" / "yolo11n.pt"
+MODEL_PATH = ML_DIR / "models" / "lego_yolo11n.pt"
 EXHIBITION_PHASE_DIR = TEST_DIR / "exhibition_phase"
 
 if str(EXHIBITION_PHASE_DIR) not in sys.path:
