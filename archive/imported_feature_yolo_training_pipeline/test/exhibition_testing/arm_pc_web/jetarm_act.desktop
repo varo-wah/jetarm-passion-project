@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=JetAuto Arm
+Comment=JetAuto Arm Program
+Encoding=UTF-8
+Exec=bash /home/jetauto/jetauto_software/jetauto_arm_pc/jetauto_arm.sh
+Terminal=false
+MultipleArgs=false
+Type=Application
+Categories=Application;Development;
+StartupNotify=true
+Icon=/home/jetauto/jetauto_software/jetauto_arm_pc/resources/arm.png

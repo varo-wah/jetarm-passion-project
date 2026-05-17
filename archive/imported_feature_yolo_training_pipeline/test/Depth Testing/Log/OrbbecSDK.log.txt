@@ -1,0 +1,60 @@
+[03/17 15:46:52.030678][debug][16061][Context.cpp:30] Context creating, work_dir=/home/ubuntu/jetarm-passion-project/test
+[03/17 15:46:52.030941][debug][16061][Context.cpp:49] Config file version=1.1
+[03/17 15:46:52.031780][debug][16061][FrameBufferManager.cpp:23] Max global frame buffer size updated! size=2048.000MB
+[03/17 15:46:52.031978][info][16061][Context.cpp:68] Context created with config: /home/ubuntu/third_party_ros2/orbbec_ws/install/orbbec_camera/share/orbbec_camera/config/OrbbecSDKConfig_v1.0.xml
+[03/17 15:46:52.032156][info][16061][Context.cpp:73] Work directory=/home/ubuntu/jetarm-passion-project/test, SDK version=v1.10.15-20241012-bb4e350
+[03/17 15:46:52.032261][debug][16061][DeviceManager.cpp:30] DeviceManager init ...
+[03/17 15:46:52.032336][info][16061][LinuxPal.cpp:32] createObPal: create LinuxPal!
+[03/17 15:46:52.034669][debug][16061][DeviceManager.cpp:34] Enable USB Device Enumerator ...
+[03/17 15:46:52.099520][debug][16061][EnumeratorLibusb.cpp:324] queryDevicesInfo done!
+[03/17 15:46:52.099691][debug][16061][UsbDeviceEnumerator.cpp:163] Current usb device port list:
+[03/17 15:46:52.099722][debug][16061][UsbDeviceEnumerator.cpp:166]  - 1-2.2.1-9.0 | USB Camera
+[03/17 15:46:52.100493][info][16061][LinuxPal.cpp:166] Create PollingDeviceWatcher!
+[03/17 15:46:52.100602][debug][16061][UsbDeviceEnumerator.cpp:78] No matched usb device found!
+[03/17 15:46:52.100624][info][16061][DeviceManager.cpp:15] Current found device(s): (0)
+[03/17 15:46:52.100637][debug][16061][DeviceManager.cpp:52] DeviceManager construct done!
+[03/17 15:46:52.106145][info][16061][DeviceManager.cpp:304] Enable net device enumeration: false
+[03/17 15:48:08.590455][debug][16061][Context.cpp:81] Context destroying ...
+[03/17 15:48:08.590684][debug][16061][DeviceManager.cpp:56] DeviceManager destroy ...
+[03/17 15:48:08.590724][debug][16061][DeviceManager.cpp:64] DeviceManager Destructors done
+[03/17 15:48:08.591541][info][16061][Context.cpp:84] Context destroyed
+[03/17 15:48:18.086002][debug][17359][Context.cpp:30] Context creating, work_dir=/home/ubuntu/jetarm-passion-project/test
+[03/17 15:48:18.086128][debug][17359][Context.cpp:49] Config file version=1.1
+[03/17 15:48:18.086177][debug][17359][FrameBufferManager.cpp:23] Max global frame buffer size updated! size=2048.000MB
+[03/17 15:48:18.086188][info][17359][Context.cpp:68] Context created with config: /home/ubuntu/third_party_ros2/orbbec_ws/install/orbbec_camera/share/orbbec_camera/config/OrbbecSDKConfig_v1.0.xml
+[03/17 15:48:18.086221][info][17359][Context.cpp:73] Work directory=/home/ubuntu/jetarm-passion-project/test, SDK version=v1.10.15-20241012-bb4e350
+[03/17 15:48:18.086236][debug][17359][DeviceManager.cpp:30] DeviceManager init ...
+[03/17 15:48:18.086243][info][17359][LinuxPal.cpp:32] createObPal: create LinuxPal!
+[03/17 15:48:18.087646][debug][17359][DeviceManager.cpp:34] Enable USB Device Enumerator ...
+[03/17 15:48:18.257830][debug][17359][EnumeratorLibusb.cpp:324] queryDevicesInfo done!
+[03/17 15:48:18.257989][debug][17359][UsbDeviceEnumerator.cpp:163] Current usb device port list:
+[03/17 15:48:18.258024][debug][17359][UsbDeviceEnumerator.cpp:166]  - 1-2.2.1-9.0 | USB Camera
+[03/17 15:48:18.258371][info][17359][LinuxPal.cpp:166] Create PollingDeviceWatcher!
+[03/17 15:48:18.258782][debug][17359][UsbDeviceEnumerator.cpp:78] No matched usb device found!
+[03/17 15:48:18.258812][info][17359][DeviceManager.cpp:15] Current found device(s): (0)
+[03/17 15:48:18.258827][debug][17359][DeviceManager.cpp:52] DeviceManager construct done!
+[03/17 15:48:18.266076][info][17359][DeviceManager.cpp:304] Enable net device enumeration: false
+[03/17 15:49:29.584332][debug][17359][Context.cpp:81] Context destroying ...
+[03/17 15:49:29.591503][debug][17359][DeviceManager.cpp:56] DeviceManager destroy ...
+[03/17 15:49:29.591566][debug][17359][DeviceManager.cpp:64] DeviceManager Destructors done
+[03/17 15:49:29.592147][info][17359][Context.cpp:84] Context destroyed
+[03/17 15:49:43.083085][debug][17723][Context.cpp:30] Context creating, work_dir=/home/ubuntu/jetarm-passion-project/test
+[03/17 15:49:43.084340][debug][17723][Context.cpp:49] Config file version=1.1
+[03/17 15:49:43.084532][debug][17723][FrameBufferManager.cpp:23] Max global frame buffer size updated! size=2048.000MB
+[03/17 15:49:43.084622][info][17723][Context.cpp:68] Context created with config: /home/ubuntu/third_party_ros2/orbbec_ws/install/orbbec_camera/share/orbbec_camera/config/OrbbecSDKConfig_v1.0.xml
+[03/17 15:49:43.086520][info][17723][Context.cpp:73] Work directory=/home/ubuntu/jetarm-passion-project/test, SDK version=v1.10.15-20241012-bb4e350
+[03/17 15:49:43.087117][debug][17723][DeviceManager.cpp:30] DeviceManager init ...
+[03/17 15:49:43.087438][info][17723][LinuxPal.cpp:32] createObPal: create LinuxPal!
+[03/17 15:49:43.089318][debug][17723][DeviceManager.cpp:34] Enable USB Device Enumerator ...
+[03/17 15:49:43.253151][debug][17723][EnumeratorLibusb.cpp:324] queryDevicesInfo done!
+[03/17 15:49:43.253304][debug][17723][UsbDeviceEnumerator.cpp:163] Current usb device port list:
+[03/17 15:49:43.253335][debug][17723][UsbDeviceEnumerator.cpp:166]  - 1-2.2.1-9.0 | USB Camera
+[03/17 15:49:43.253630][info][17723][LinuxPal.cpp:166] Create PollingDeviceWatcher!
+[03/17 15:49:43.253727][debug][17723][UsbDeviceEnumerator.cpp:78] No matched usb device found!
+[03/17 15:49:43.253757][info][17723][DeviceManager.cpp:15] Current found device(s): (0)
+[03/17 15:49:43.253776][debug][17723][DeviceManager.cpp:52] DeviceManager construct done!
+[03/17 15:49:43.257123][info][17723][DeviceManager.cpp:304] Enable net device enumeration: false
+[03/17 15:50:04.137924][debug][17723][Context.cpp:81] Context destroying ...
+[03/17 15:50:04.138047][debug][17723][DeviceManager.cpp:56] DeviceManager destroy ...
+[03/17 15:50:04.138075][debug][17723][DeviceManager.cpp:64] DeviceManager Destructors done
+[03/17 15:50:04.138924][info][17723][Context.cpp:84] Context destroyed

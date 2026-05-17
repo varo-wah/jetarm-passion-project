@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JetArm Control Panel</title>
+
+    <style>
+      :root{
+        --bg:#0b0f16;
+        --panel:#121a26;
+        --panel2:#0f1622;
+        --text:#d7e2f0;
+        --muted:#8ea2bd;
+        --line:#233247;
+
+        --good:#1ed760;
+        --warn:#f5c542;
+        --bad:#ff4d4d;
+
+        --btn:#1b2636;
+        --btn2:#223149;
+        --accent:#49b6ff;
+
+        --radius:16px;
+      }
+
+      *{box-sizing:border-box}
+      body{
+        margin:0;
+        background: radial-gradient(1200px 600px at 20% 0%, #12223a 0%, var(--bg) 55%) fixed;
+        color:var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        line-height:1.35;
+      }
+
+      .topbar{
+        position:sticky; top:0; z-index:10;
+        background: rgba(11,15,22,0.85);
+        backdrop-filter: blur(10px);
+        border-bottom:1px solid rgba(35,50,71,0.7);
+      }
+      .topbar-inner{
+        max-width:1200px;
+        margin:0 auto;
+        padding:12px 14px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+      }
+      .brand{
+        display:flex; align-items:center; gap:10px;
+        font-weight:700;
+        letter-spacing:0.4px;
+      }
+      .dot{
+        width:10px; height:10px; border-radius:50%;
+        background: var(--warn);
+        box-shadow: 0 0 10px rgba(245,197,66,0.55);
+      }
+      .pill{
+        display:flex; align-items:center; gap:8px;
+        padding:8px 10px;
+        border:1px solid rgba(35,50,71,0.9);
+        background: rgba(18,26,38,0.7);
+        border-radius:999px;
+        color:var(--muted);
+        font-size:12px;
+        white-space:nowrap;
+      }
+      .pill b{color:var(--text); font-weight:600}
+
+      .wrap{
+        max-width:1200px;
+        margin:0 auto;
+        padding:14px;
+      }
+
+      .grid{
+        display:grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap:14px;
+      }
+      @media (max-width: 900px){
+        .grid{ grid-template-columns: 1fr; }
+      }
+
+      .card{
+        background: rgba(18,26,38,0.75);
+        border:1px solid rgba(35,50,71,0.9);
+        border-radius: var(--radius);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        overflow:hidden;
+      }
+
+      .card-h{
+        padding:12px 12px 10px;
+        display:flex; align-items:center; justify-content:space-between;
+        border-bottom:1px solid rgba(35,50,71,0.7);
+        background: rgba(15,22,34,0.55);
+      }
+      .card-h .title{
+        font-size:13px;
+        color:var(--muted);
+        letter-spacing:0.3px;
+        text-transform:uppercase;
+      }
+
+      /* Panels */
+      .panel{
+        background: rgba(15,22,34,0.55);
+        border:1px solid rgba(35,50,71,0.85);
+        border-radius: 14px;
+        padding:12px;
+      }
+      .panel .title{
+        font-size:13px;
+        color:var(--muted);
+        letter-spacing:0.3px;
+        text-transform:uppercase;
+        margin-bottom:8px;
+      }
+
+      /* Video */
+      .video-shell{ padding:12px; }
+      .video-frame{
+        width:100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 14px;
+        border:1px solid rgba(35,50,71,0.85);
+        background: #05070b;
+        overflow:hidden;
+        position:relative;
+      }
+      .video-frame img{
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        display:block;
+      }
+      .video-overlay{
+        position:absolute;
+        left:10px; bottom:10px;
+        display:flex; gap:8px; flex-wrap:wrap;
+      }
+      .tag{
+        font-size:12px;
+        padding:6px 8px;
+        border-radius:999px;
+        border:1px solid rgba(35,50,71,0.85);
+        background: rgba(10,14,20,0.55);
+        color: var(--muted);
+      }
+      .tag b{ color: var(--text); font-weight:600; }
+
+      /* Controls */
+      .controls{
+        padding:12px;
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+      }
+
+      .row{
+        display:flex;
+        gap:10px;
+        flex-wrap:wrap;
+      }
+
+      .btn{
+        appearance:none;
+        border:none;
+        border-radius: 14px;
+        padding:12px 12px;
+        background: linear-gradient(180deg, var(--btn2), var(--btn));
+        color: var(--text);
+        font-weight:650;
+        letter-spacing:0.2px;
+        cursor:pointer;
+        border:1px solid rgba(35,50,71,0.9);
+        min-width: 120px;
+        flex:1 1 120px;
+      }
+      .btn:hover{ filter: brightness(1.05); }
+      .btn:active{ transform: translateY(1px); }
+      .btn:disabled{ opacity:0.5; cursor:not-allowed; transform:none; }
+
+      .btn-primary{
+        border-color: rgba(73,182,255,0.55);
+        box-shadow: 0 0 0 1px rgba(73,182,255,0.15) inset;
+      }
+      .btn-danger{
+        border-color: rgba(255,77,77,0.55);
+        box-shadow: 0 0 0 1px rgba(255,77,77,0.15) inset;
+      }
+
+      .kv{
+        display:grid;
+        grid-template-columns: 120px 1fr;
+        gap:8px 10px;
+        font-size:13px;
+        color:var(--muted);
+      }
+      .kv .v{ color: var(--text); font-weight:600; }
+
+      .inputs{
+        display:grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap:10px;
+      }
+      @media (max-width: 900px){
+        .inputs{ grid-template-columns: 1fr; }
+      }
+
+      .field label{
+        display:block;
+        font-size:12px;
+        color: var(--muted);
+        margin-bottom:6px;
+      }
+      .field input{
+        width:100%;
+        padding:12px 12px;
+        border-radius: 12px;
+        border:1px solid rgba(35,50,71,0.9);
+        background: rgba(9,12,18,0.7);
+        color: var(--text);
+        outline:none;
+        font-size:14px;
+      }
+
+      .hint{ margin-top:8px; font-size:12px; color: var(--muted); }
+
+      .danger-zone{
+        border-color: rgba(255,77,77,0.4);
+        background: rgba(40,12,12,0.25);
+      }
+
+      .tiny{ font-size:12px; color:var(--muted); }
+    </style>
+  </head>
+
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="dot" id="connDot"></div>
+          <div>JetArm Control Panel</div>
+        </div>
+        <div class="pill">
+          <span>State:</span>
+          <b id="stateText">UNKNOWN</b>
+          <span style="opacity:.55">|</span>
+          <span>FPS:</span>
+          <b id="fpsText">--</b>
+          <span style="opacity:.55">|</span>
+          <span>Scanner:</span>
+          <b id="scannerText">--</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <div class="grid">
+        <!-- LEFT: VIDEO -->
+        <div class="card">
+          <div class="card-h">
+            <div class="title">Live Camera</div>
+            <div class="tiny" id="videoMeta">/video</div>
+          </div>
+
+          <div class="video-shell">
+            <div class="video-frame">
+              <img id="videoEl" src="/video" alt="Live stream" />
+              <div class="video-overlay">
+                <div class="tag">Last action: <b id="lastActionText">--</b></div>
+                <div class="tag">Last detection: <b id="lastDetText">--</b></div>
+              </div>
+            </div>
+            <div class="hint">Tip: if stream freezes, refresh once. Persistent freezes usually means the overlay crashed or camera is busy.</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: STATUS + CONTROLS -->
+        <div class="card">
+          <div class="card-h">
+            <div class="title">Controls</div>
+            <div class="tiny" id="serverTime">--</div>
+          </div>
+
+          <div class="controls">
+            <!-- Status panel -->
+            <div class="panel">
+              <div class="kv">
+                <div class="k">Connection</div><div class="v" id="connText">--</div>
+                <div class="k">Sort count</div><div class="v" id="countText">--</div>
+                <div class="k">Scanner</div><div class="v" id="scannerText2">--</div>
+                <div class="k">Jog target</div><div class="v" id="jogText">--</div>
+                <div class="k">Last error</div><div class="v" id="errText">--</div>
+              </div>
+            </div>
+
+            <!-- Main buttons -->
+            <div class="panel">
+              <div class="row">
+                <button class="btn btn-primary" id="btnPause">Pause</button>
+                <button class="btn btn-primary" id="btnResume">Resume</button>
+              </div>
+              <div class="row">
+                <button class="btn btn-danger" id="btnStop">Stop</button>
+                <button class="btn btn-danger" id="btnEstop">E-Stop</button>
+              </div>
+              <div class="row">
+                <button class="btn btn-primary" id="btnScannerStart">Start Vision Scanner</button>
+                <button class="btn btn-danger" id="btnScannerStop">Stop Vision Scanner</button>
+              </div>
+              <div class="hint">Stop/E-Stop is safety-critical. Backend must enforce motor safety.</div>
+            </div>
+
+            <!-- Manual GoTo -->
+            <div class="panel">
+              <div class="title">Go To</div>
+
+              <div class="inputs">
+                <div class="field">
+                  <label for="xIn">X</label>
+                  <input id="xIn" inputmode="decimal" placeholder="e.g. 10.5" />
+                </div>
+                <div class="field">
+                  <label for="yIn">Y</label>
+                  <input id="yIn" inputmode="decimal" placeholder="e.g. 22.0" />
+                </div>
+                <div class="field">
+                  <label for="zIn">Z</label>
+                  <input id="zIn" inputmode="decimal" placeholder="e.g. 8.0" />
+                </div>
+              </div>
+
+              <div class="row" style="margin-top:10px">
+                <button class="btn btn-primary" id="btnGoto">Go To (X,Y,Z)</button>
+                <button class="btn" id="btnHome">Home</button>
+              </div>
+
+              <div class="row" style="margin-top:10px">
+                <button class="btn" id="btnGripOpen">Open Gripper</button>
+                <button class="btn" id="btnGripClose">Close Gripper</button>
+              </div>
+
+              <div class="hint">Validation should be server-side (limits, collisions, speed caps).</div>
+            </div>
+
+            <!-- Jog Controls (D-pad) -->
+            <div class="panel">
+              <div class="title">Jog Controls</div>
+
+              <div style="display:grid; grid-template-columns: 1fr 180px 1fr; gap:12px; align-items:center;">
+                <!-- Z column -->
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                  <button class="btn btn-primary" id="btnZUp">Z Up</button>
+                  <button class="btn btn-primary" id="btnZDown">Z Down</button>
+                </div>
+
+                <!-- D-pad -->
+                <div style="display:grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px 60px; gap:8px; justify-content:center;">
+                  <div></div>
+                  <button class="btn btn-primary" id="btnFwd" style="min-width:0; padding:10px;">↑</button>
+                  <div></div>
+
+                  <button class="btn btn-primary" id="btnLeft" style="min-width:0; padding:10px;">←</button>
+                  <button class="btn btn-danger" id="btnCenter" style="min-width:0; padding:10px;">●</button>
+                  <button class="btn btn-primary" id="btnRight" style="min-width:0; padding:10px;">→</button>
+
+                  <div></div>
+                  <button class="btn btn-primary" id="btnBack" style="min-width:0; padding:10px;">↓</button>
+                  <div></div>
+                </div>
+
+                <!-- Step size -->
+                <div>
+                  <div class="field">
+                    <label for="stepIn">Step (cm)</label>
+                    <input id="stepIn" inputmode="decimal" value="0.5" />
+                  </div>
+                  <div class="hint">Tap to jog. ● resets to the default jog pose.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Danger zone -->
+            <div class="panel danger-zone">
+              <div class="tiny">
+                Danger zone: E-Stop should cut motion immediately and latch until cleared.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ---------- helpers ----------
+      const $ = (id) => document.getElementById(id);
+      let joySpeed = 0.3; // will be overwritten by /api/status if provided
+
+      function setConn(ok){
+        $("connDot").style.background = ok ? "var(--good)" : "var(--bad)";
+        $("connDot").style.boxShadow = ok
+          ? "0 0 10px rgba(30,215,96,0.55)"
+          : "0 0 10px rgba(255,77,77,0.55)";
+        $("connText").textContent = ok ? "ONLINE" : "OFFLINE";
+      }
+
+      async function postCmd(type, payload){
+        const body = { type, ...payload };
+        const res = await fetch("/api/cmd", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ("HTTP " + res.status));
+        }
+        return await res.json();
+      }
+
+      async function postScanner(path){
+        const res = await fetch(path, { method: "POST" });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ("HTTP " + res.status));
+        }
+        return await res.json();
+      }
+
+      function numOrNull(v){
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function stepValCm(){
+        const n = Number($("stepIn").value);
+        return Number.isFinite(n) ? n : 0.5;
+      }
+
+      // Server joystick endpoint uses: joy_target += dx * JOY_SPEED
+      // We want stepIn in cm, so convert cm -> ticks by dividing by JOY_SPEED.
+      function cmToTicks(cm){
+        const s = Number(joySpeed);
+        if (!Number.isFinite(s) || s <= 0) return cm;
+        return cm / s;
+      }
+
+      async function postJoystick(dx_cm, dy_cm, dz_cm){
+        const body = {
+          dx: cmToTicks(dx_cm),
+          dy: cmToTicks(dy_cm),
+          dz: cmToTicks(dz_cm),
+        };
+        const res = await fetch("/api/joystick", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ("HTTP " + res.status));
+        }
+        return await res.json();
+      }
+
+      async function postJoystickReset(){
+        const res = await fetch("/api/joystick/reset", { method: "POST" });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || ("HTTP " + res.status));
+        }
+        return await res.json();
+      }
+
+      // ---------- button wiring ----------
+      $("btnPause").onclick  = async () => { try { await postCmd("pause", {}); } catch(e){ alert("Pause failed: " + e.message); } };
+      $("btnResume").onclick = async () => { try { await postCmd("resume", {}); } catch(e){ alert("Resume failed: " + e.message); } };
+
+      $("btnStop").onclick   = async () => {
+        if (!confirm("STOP the system?")) return;
+        try { await postCmd("stop", {}); } catch(e){ alert("Stop failed: " + e.message); }
+      };
+
+      $("btnEstop").onclick  = async () => {
+        if (!confirm("E-STOP NOW?")) return;
+        try { await postCmd("estop", {}); } catch(e){ alert("E-Stop failed: " + e.message); }
+      };
+
+      $("btnScannerStart").onclick = async () => {
+        try { await postScanner("/api/scanner/start"); }
+        catch(e){ alert("Start Vision Scanner failed: " + e.message); }
+      };
+
+      $("btnScannerStop").onclick = async () => {
+        if (!confirm("Stop Vision Scanner?")) return;
+        try { await postScanner("/api/scanner/stop"); }
+        catch(e){ alert("Stop Vision Scanner failed: " + e.message); }
+      };
+
+      $("btnGoto").onclick = async () => {
+        const x = numOrNull($("xIn").value);
+        const y = numOrNull($("yIn").value);
+        const z = numOrNull($("zIn").value);
+        if (x === null || y === null || z === null) { alert("Enter valid X, Y, Z numbers."); return; }
+        try { await postCmd("goto", { x, y, z }); } catch(e){ alert("GoTo failed: " + e.message); }
+      };
+
+      $("btnHome").onclick = async () => { try { await postCmd("home", {}); } catch(e){ alert("Home failed: " + e.message); } };
+
+      $("btnGripOpen").onclick  = async () => { try { await postCmd("open_gripper", {}); } catch(e){ alert("Open gripper failed: " + e.message); } };
+      $("btnGripClose").onclick = async () => { try { await postCmd("close_gripper", {}); } catch(e){ alert("Close gripper failed: " + e.message); } };
+
+      // Jog (D-pad): ↑ = +Y, ↓ = -Y, → = +X, ← = -X, Z Up/Down = ±Z
+      $("btnLeft").onclick  = async () => { try { await postJoystick(-stepValCm(), 0, 0); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnRight").onclick = async () => { try { await postJoystick( stepValCm(), 0, 0); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnFwd").onclick   = async () => { try { await postJoystick(0, stepValCm(), 0); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnBack").onclick  = async () => { try { await postJoystick(0,-stepValCm(), 0); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnZUp").onclick   = async () => { try { await postJoystick(0, 0, stepValCm()); } catch(e){ alert("Jog failed: " + e.message); } };
+      $("btnZDown").onclick = async () => { try { await postJoystick(0, 0,-stepValCm()); } catch(e){ alert("Jog failed: " + e.message); } };
+
+      $("btnCenter").onclick = async () => {
+        if (!confirm("Reset jog target to default pose?")) return;
+        try { await postJoystickReset(); } catch(e){ alert("Reset failed: " + e.message); }
+      };
+
+      // ---------- status polling ----------
+      function setScannerText(running){
+        const t = running ? "RUNNING" : "OFF";
+        $("scannerText").textContent = t;
+        $("scannerText2").textContent = t;
+      }
+
+      async function refreshStatus(){
+        try{
+          const res = await fetch("/api/status", { cache: "no-store" });
+          if(!res.ok) throw new Error("HTTP " + res.status);
+          const s = await res.json();
+
+          setConn(true);
+
+          $("stateText").textContent = s.state ?? "UNKNOWN";
+          $("fpsText").textContent = (s.fps ?? "--");
+          $("lastActionText").textContent = s.last_action ?? "--";
+          $("lastDetText").textContent = s.last_detection ?? "--";
+          $("countText").textContent = (s.sort_count ?? "--");
+          $("errText").textContent = s.last_error ?? "--";
+          $("serverTime").textContent = s.server_time ?? "--";
+
+          const running = !!s.scanner_running;
+          setScannerText(running);
+
+          if (Number.isFinite(Number(s.joy_speed))) joySpeed = Number(s.joy_speed);
+
+          if (s.joy_target && typeof s.joy_target === "object"){
+            const x = Number(s.joy_target.x);
+            const y = Number(s.joy_target.y);
+            const z = Number(s.joy_target.z);
+            if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
+              $("jogText").textContent = `${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`;
+            }
+          }
+
+        }catch(e){
+          setConn(false);
+        }
+      }
+
+      refreshStatus();
+      setInterval(refreshStatus, 350);
+    </script>
+  </body>
+</html>
