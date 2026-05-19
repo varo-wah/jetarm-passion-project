@@ -216,6 +216,13 @@ data/yolo/images/
 data/yolo/labels/
 outputs/
 
+!data/raw/
+!data/raw/lego/
+!data/raw/lego/**
+!data/processed/
+!data/processed/jetarm-lego-detector/
+!data/processed/jetarm-lego-detector/**
+
 # Large model artifacts are usually managed outside Git unless intentionally tracked.
 models/trained/
 models/exported/

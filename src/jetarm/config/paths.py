@@ -7,10 +7,13 @@ PACKAGE_DIR = SRC_DIR / "jetarm"
 
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_IMAGES_DIR = DATA_DIR / "raw" / "images"
+RAW_LEGO_IMAGES_DIR = DATA_DIR / "raw" / "lego"
 RAW_VIDEOS_DIR = DATA_DIR / "raw" / "videos"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
 PROCESSED_IMAGES_DIR = DATA_DIR / "processed" / "images"
 LABELS_DIR = DATA_DIR / "processed" / "labels"
 YOLO_DATA_DIR = DATA_DIR / "yolo"
+LEGO_YOLO_DATASET_DIR = DATA_DIR / "processed" / "jetarm-lego-detector"
 CALIBRATION_DIR = DATA_DIR / "calibration"
 
 MODELS_DIR = PROJECT_ROOT / "models"
@@ -21,4 +24,3 @@ EXPORTED_MODELS_DIR = MODELS_DIR / "exported"
 OUTPUT_DIR = PROJECT_ROOT / "outputs"
 DOCS_DIR = PROJECT_ROOT / "docs"
 ARCHIVE_DIR = PROJECT_ROOT / "archive"
-

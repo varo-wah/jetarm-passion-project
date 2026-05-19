@@ -4,7 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c5566ae3-17d7-45b2-996f-ea8dad2ed037" name="Changes" comment="" />
+    <list default="true" id="c5566ae3-17d7-45b2-996f-ea8dad2ed037" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/test_camera.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/test_camera.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jetarm/config/paths.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/config/paths.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jetarm/config/yolo_config.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/config/yolo_config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jetarm/vision/yolo_detector.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/vision/yolo_detector.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -33,22 +40,22 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;codex/define-phased-project-structure&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/williamhartono/Desktop/J.A.R.V.I.S./TECH Projects/JetArm Orin NX/jetarm-passion-project&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "codex/define-phased-project-structure",
+    "last_opened_file_path": "/Users/williamhartono/Desktop/J.A.R.V.I.S./TECH Projects/JetArm Orin NX/jetarm-passion-project",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -66,6 +73,7 @@
       <updated>1777725768522</updated>
       <workItem from="1777725769724" duration="1328000" />
       <workItem from="1777887683344" duration="2347000" />
+      <workItem from="1779011392253" duration="1388000" />
     </task>
     <servers />
   </component>

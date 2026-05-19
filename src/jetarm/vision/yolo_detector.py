@@ -23,14 +23,14 @@ from typing import Any, Dict, List, Optional
 import cv2
 from ultralytics import YOLO
 
-from jetarm.config.yolo_config import YOLO11N_MODEL_PATH
+from jetarm.config.yolo_config import LEGO_YOLO_MODEL_PATH
 from jetarm.vision.coordinatelogic import pixel_to_robot
 
 # ============================================================
 # 1. PATH SETUP
 # ============================================================
 
-MODEL_PATH = YOLO11N_MODEL_PATH
+MODEL_PATH = LEGO_YOLO_MODEL_PATH
 
 
 # ============================================================
