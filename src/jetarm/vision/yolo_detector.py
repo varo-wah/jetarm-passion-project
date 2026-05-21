@@ -24,7 +24,7 @@ import cv2
 from ultralytics import YOLO
 
 from jetarm.config.yolo_config import LEGO_YOLO_MODEL_PATH
-from jetarm.vision.coordinatelogic import pixel_to_robot
+from jetarm.vision.coordinatelogic import detect_color, pixel_to_robot
 
 # ============================================================
 # 1. PATH SETUP
@@ -141,6 +141,17 @@ def extract_detections(frame, result) -> List[Dict[str, Any]]:
 
         robot_x, robot_y = pixel_to_robot(center_x, center_y)
         angle = estimate_angle_from_yolo_box(frame, x1, y1, x2, y2)
+        box_w = x2 - x1
+        box_h = y2 - y1
+        pad = int(min(box_w, box_h) * 0.08)
+        pad = max(2, min(pad, 6))
+        color = detect_color(
+            frame,
+            x1 + pad,
+            y1 + pad,
+            max(1, box_w - 2 * pad),
+            max(1, box_h - 2 * pad),
+        )
 
         detections.append({
             "class_id": class_id,
@@ -150,6 +161,7 @@ def extract_detections(frame, result) -> List[Dict[str, Any]]:
             "robot_x": round(float(robot_x), 2),
             "robot_y": round(float(robot_y), 2),
             "angle": round(float(angle), 1),
+            "color": color,
             "x1": x1,
             "y1": y1,
             "x2": x2,
@@ -227,7 +239,7 @@ def to_vision_scanner_format(detections: List[Dict[str, Any]]) -> List[Dict[str,
             "x": float(detection["robot_x"]),
             "y": float(detection["robot_y"]),
             "angle": float(angle),
-            "color": "YOLO",
+            "color": detection.get("color", "NEUTRAL"),
         })
 
     return bricks

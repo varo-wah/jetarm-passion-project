@@ -23,7 +23,6 @@ from jetarm.vision.yolo_detector import choose_target, detect_objects, load_mode
 CAMERA_INDEX = 0
 FRAME_DELAY = 0.03
 PRINT_INTERVAL_S = 0.25
-COLOR_LABEL = "YOLO"
 
 
 def draw_detection(frame, detection, is_target):
@@ -37,6 +36,7 @@ def draw_detection(frame, detection, is_target):
     robot_y = detection["robot_y"]
     angle = detection["angle"]
     confidence = detection["confidence"]
+    color = detection.get("color", "NEUTRAL")
 
     box_color = (0, 0, 255) if is_target else (0, 255, 0)
     text_color = (0, 0, 255) if is_target else (0, 255, 255)
@@ -51,7 +51,7 @@ def draw_detection(frame, detection, is_target):
     text_y = max(20, y1 - 54)
 
     labels = [
-        f"{COLOR_LABEL} conf={confidence}",
+        f"{color} conf={confidence}",
         f"robot=({robot_x:.2f},{robot_y:.2f})",
         f"angle={angle:.1f}",
         f"px=({center_x},{center_y})",
@@ -80,7 +80,7 @@ def draw_detections(frame, detections, target):
             f"TARGET: x={target['robot_x']:.2f}, "
             f"y={target['robot_y']:.2f}, "
             f"angle={target['angle']:.1f}, "
-            f"color={COLOR_LABEL}"
+            f"color={target.get('color', 'NEUTRAL')}"
         )
 
     cv2.putText(frame, status, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
@@ -97,7 +97,7 @@ def print_detections(detections):
             f"x={detection['robot_x']:.2f}, "
             f"y={detection['robot_y']:.2f}, "
             f"angle={detection['angle']:.1f}, "
-            f"color={COLOR_LABEL}, "
+            f"color={detection.get('color', 'NEUTRAL')}, "
             f"confidence={detection['confidence']:.2f}"
         )
 
