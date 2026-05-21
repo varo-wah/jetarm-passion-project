@@ -21,6 +21,7 @@ from jetarm.hardware.Class_Execution import (
     pause_system, resume_system
 )
 from jetarm.ui.viewer_overlay import annotate_frame
+from jetarm.ui.yolo_overlay import annotate_yolo_frame
 
 # -------------------------------------------------
 # Joystick / Jog state
@@ -59,7 +60,15 @@ def index() -> HTMLResponse:
         return HTMLResponse(f.read())
 
 
-def mjpeg_generator() -> Generator[bytes, None, None]:
+def _annotate_for_mode(frame, mode: str):
+    if mode == "raw":
+        return frame
+    if mode == "yolo":
+        return annotate_yolo_frame(frame)
+    return annotate_frame(frame)
+
+
+def mjpeg_generator(mode: str = "opencv") -> Generator[bytes, None, None]:
     """
     Streams frames as multipart/x-mixed-replace (MJPEG).
     Browser can display it in <img src="/video">.
@@ -71,9 +80,9 @@ def mjpeg_generator() -> Generator[bytes, None, None]:
             time.sleep(0.05)
             continue
 
-        # Apply overlay BEFORE encoding (and don't let overlay crash the stream)
+        # Apply overlay BEFORE encoding. If an overlay crashes, keep stream alive.
         try:
-            frame = annotate_frame(frame)
+            frame = _annotate_for_mode(frame, mode)
         except Exception:
             pass
 
@@ -90,8 +99,29 @@ def mjpeg_generator() -> Generator[bytes, None, None]:
 
 @app.get("/video")
 def video() -> StreamingResponse:
+    return video_opencv()
+
+
+@app.get("/video/raw")
+def video_raw() -> StreamingResponse:
     return StreamingResponse(
-        mjpeg_generator(),
+        mjpeg_generator("raw"),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@app.get("/video/opencv")
+def video_opencv() -> StreamingResponse:
+    return StreamingResponse(
+        mjpeg_generator("opencv"),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@app.get("/video/yolo")
+def video_yolo() -> StreamingResponse:
+    return StreamingResponse(
+        mjpeg_generator("yolo"),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
 
