@@ -10,7 +10,7 @@ import numpy as np
 import requests
 
 from jetarm.hardware.Class_Execution import ik, gripper, camera
-from jetarm.vision.coordinatelogic import detect_bricks
+from jetarm.vision.yolo_detector import detect_bricks_yolo as detect_bricks
 
 UI_SERVER = os.environ.get("UI_SERVER", "http://127.0.0.1:8000")
 FRAME_URL = f"{UI_SERVER}/api/frame.jpg"

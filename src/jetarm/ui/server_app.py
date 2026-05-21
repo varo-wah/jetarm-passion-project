@@ -107,7 +107,7 @@ _status = {
 }
 
 _scanner_proc: subprocess.Popen | None = None
-SCANNER_MODULE = "jetarm.vision.Vision_Scanner"
+SCANNER_MODULE = "jetarm.sorting.Vision_Scanner"
 
 
 @app.post("/api/joystick")
