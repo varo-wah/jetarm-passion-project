@@ -6,12 +6,18 @@
   <component name="ChangeListManager">
     <list default="true" id="c5566ae3-17d7-45b2-996f-ea8dad2ed037" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/jetarm/hardware/servo_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/archive/exhibition_testing/Old Movement/servo_controller.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -52,6 +58,12 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src/jetarm/hardware" />
+      <recent name="$PROJECT_DIR$/archive/exhibition_testing/Old Movement" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
