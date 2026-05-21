@@ -1,18 +1,12 @@
 import cv2
 import numpy as np
+
+from jetarm.config.detection_roi import (
+    ROI_DRAW_BOX,
+    ROI_MASK_DISPLAY,
+    roi_bounds_from_shape,
+)
 from jetarm.vision.coordinatelogic import detect_color, pixel_to_robot
-
-# =========================
-# ROI (TUNE THESE)
-# Bigger ROI: decrease X0/Y0, increase X1/Y1
-# =========================
-ROI_X0_FRAC = 0.12
-ROI_X1_FRAC = 0.88
-ROI_Y0_FRAC = 0.03
-ROI_Y1_FRAC = 0.75
-
-ROI_DRAW_BOX = True
-ROI_MASK_DISPLAY = False   # visual only (does not affect detection)
 
 MIN_AREA = 400
 MAX_AREA = 20000
@@ -23,17 +17,7 @@ MORPH_KERNEL = (3, 3)
 
 
 def _roi_bounds(frame):
-    h, w = frame.shape[:2]
-    x0 = int(w * ROI_X0_FRAC)
-    x1 = int(w * ROI_X1_FRAC)
-    y0 = int(h * ROI_Y0_FRAC)
-    y1 = int(h * ROI_Y1_FRAC)
-
-    x0 = max(0, min(x0, w - 2))
-    x1 = max(x0 + 1, min(x1, w - 1))
-    y0 = max(0, min(y0, h - 2))
-    y1 = max(y0 + 1, min(y1, h - 1))
-    return x0, y0, x1, y1
+    return roi_bounds_from_shape(frame.shape)
 
 
 def annotate_frame(frame):

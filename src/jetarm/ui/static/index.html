@@ -245,6 +245,7 @@
       }
       .btn:hover{filter:brightness(1.08)}
       .btn:active{transform:translateY(1px)}
+      .btn:disabled{opacity:.62; cursor:wait; filter:none}
       .btn-primary{border-color:rgba(68,183,255,.65); background:#17334a}
       .btn-good{border-color:rgba(41,212,123,.65); background:#143225}
       .btn-warn{border-color:rgba(242,201,76,.65); background:#312a13}
@@ -343,21 +344,21 @@
           <div class="card-head">
             <div>
               <div class="title">Vision Feed</div>
-              <div class="mono" id="videoMeta">/video/yolo</div>
+              <div class="mono" id="videoMeta">/video/raw</div>
             </div>
             <div class="feed-tools">
               <div class="segmented" aria-label="Video mode">
-                <button class="seg-btn" id="feedRaw" data-src="/video/raw" data-label="RAW">Raw</button>
+                <button class="seg-btn active" id="feedRaw" data-src="/video/raw" data-label="RAW">Raw</button>
                 <button class="seg-btn" id="feedOpenCV" data-src="/video/opencv" data-label="OPENCV">OpenCV</button>
-                <button class="seg-btn active" id="feedYolo" data-src="/video/yolo" data-label="YOLO">YOLO</button>
+                <button class="seg-btn" id="feedYolo" data-src="/video/yolo" data-label="YOLO">YOLO</button>
               </div>
             </div>
           </div>
           <div class="video-shell">
             <div class="video-frame">
-              <img id="videoEl" src="/video/yolo" alt="JetArm live stream" />
+              <img id="videoEl" src="/video/raw" alt="JetArm live stream" />
               <div class="video-overlay">
-                <div class="tag">Mode: <b id="feedModeText">YOLO</b></div>
+                <div class="tag">Mode: <b id="feedModeText">RAW</b></div>
                 <div class="tag">Action: <b id="lastActionText">--</b></div>
                 <div class="tag">Detection: <b id="lastDetText">--</b></div>
               </div>
@@ -542,6 +543,23 @@
         return await res.json();
       }
 
+      async function fireImmediateCmd(button, type, sentText){
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = sentText;
+
+        try {
+          await postCmd(type, {});
+        } catch(e) {
+          alert(`${originalText} failed: ${e.message}`);
+        } finally {
+          setTimeout(() => {
+            button.disabled = false;
+            button.textContent = originalText;
+          }, 1200);
+        }
+      }
+
       function numOrNull(v){
         const n = Number(v);
         return Number.isFinite(n) ? n : null;
@@ -577,12 +595,10 @@
       $("btnPause").onclick = async () => { try { await postCmd("pause", {}); } catch(e){ alert(`Pause failed: ${e.message}`); } };
       $("btnResume").onclick = async () => { try { await postCmd("resume", {}); } catch(e){ alert(`Resume failed: ${e.message}`); } };
       $("btnStop").onclick = async () => {
-        if (!confirm("Stop robot motion?")) return;
-        try { await postCmd("stop", {}); } catch(e){ alert(`Stop failed: ${e.message}`); }
+        await fireImmediateCmd($("btnStop"), "stop", "Stop Sent");
       };
       $("btnEstop").onclick = async () => {
-        if (!confirm("Trigger software E-Stop?")) return;
-        try { await postCmd("estop", {}); } catch(e){ alert(`E-Stop failed: ${e.message}`); }
+        await fireImmediateCmd($("btnEstop"), "estop", "E-Stop Sent");
       };
 
       $("btnScannerStart").onclick = async () => {

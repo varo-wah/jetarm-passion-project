@@ -23,6 +23,12 @@ from jetarm.hardware.Class_Execution import (
 from jetarm.ui.viewer_overlay import annotate_frame
 from jetarm.ui.yolo_overlay import annotate_yolo_frame
 
+STREAM_SETTINGS = {
+    "raw": {"fps": 12.0, "jpeg_quality": 65},
+    "opencv": {"fps": 10.0, "jpeg_quality": 65},
+    "yolo": {"fps": 8.0, "jpeg_quality": 60},
+}
+
 # -------------------------------------------------
 # Joystick / Jog state
 # -------------------------------------------------
@@ -49,8 +55,9 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.on_event("startup")
 def on_startup() -> None:
-    # Start camera thread once when server starts
-    start_camera(cam_index=0)
+    # Match scripts/yolo_viewer.py capture settings so website YOLO uses the
+    # same frame geometry as the calibration/debug path.
+    start_camera(cam_index=0, width=640, height=480, fps=15)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -68,12 +75,20 @@ def _annotate_for_mode(frame, mode: str):
     return annotate_frame(frame)
 
 
+def _stream_settings_for_mode(mode: str):
+    return STREAM_SETTINGS.get(mode, STREAM_SETTINGS["opencv"])
+
+
 def mjpeg_generator(mode: str = "opencv") -> Generator[bytes, None, None]:
     """
     Streams frames as multipart/x-mixed-replace (MJPEG).
     Browser can display it in <img src="/video">.
     """
     boundary = b"--frame"
+    settings = _stream_settings_for_mode(mode)
+    frame_delay = 1.0 / settings["fps"]
+    jpeg_quality = int(settings["jpeg_quality"])
+
     while True:
         frame = get_latest_frame_copy()
         if frame is None:
@@ -86,7 +101,7 @@ def mjpeg_generator(mode: str = "opencv") -> Generator[bytes, None, None]:
         except Exception:
             pass
 
-        ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+        ok, jpg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
         if not ok:
             time.sleep(0.02)
             continue
@@ -95,6 +110,7 @@ def mjpeg_generator(mode: str = "opencv") -> Generator[bytes, None, None]:
         yield b"Content-Type: image/jpeg\r\n"
         yield b"Content-Length: " + str(len(jpg)).encode("ascii") + b"\r\n\r\n"
         yield jpg.tobytes() + b"\r\n"
+        time.sleep(frame_delay)
 
 
 @app.get("/video")

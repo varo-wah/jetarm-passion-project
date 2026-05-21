@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 import cv2
 from ultralytics import YOLO
 
+from jetarm.config.detection_roi import point_in_roi
 from jetarm.config.yolo_config import LEGO_YOLO_MODEL_PATH
 from jetarm.vision.coordinatelogic import detect_color, pixel_to_robot
 
@@ -138,6 +139,9 @@ def extract_detections(frame, result) -> List[Dict[str, Any]]:
 
         center_x = int((x1 + x2) / 2)
         center_y = int((y1 + y2) / 2)
+
+        if not point_in_roi(frame.shape, center_x, center_y):
+            continue
 
         robot_x, robot_y = pixel_to_robot(center_x, center_y)
         angle = estimate_angle_from_yolo_box(frame, x1, y1, x2, y2)

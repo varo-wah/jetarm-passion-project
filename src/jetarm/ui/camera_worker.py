@@ -19,7 +19,12 @@ _stop_event = threading.Event()
 _is_running_lock = threading.Lock()
 
 
-def _camera_loop(cam_index: int = 0, width: Optional[int] = None, height: Optional[int] = None) -> None:
+def _camera_loop(
+    cam_index: int = 0,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    fps: Optional[int] = None,
+) -> None:
     """
     Background thread function.
     Opens the camera once and continually updates latest_frame.
@@ -34,6 +39,8 @@ def _camera_loop(cam_index: int = 0, width: Optional[int] = None, height: Option
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(width))
     if height is not None:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(height))
+    if fps is not None:
+        cap.set(cv2.CAP_PROP_FPS, int(fps))
 
     try:
         # Warm-up frames (helps exposure/auto-focus settle)
@@ -60,7 +67,12 @@ def _camera_loop(cam_index: int = 0, width: Optional[int] = None, height: Option
         cap.release()
 
 
-def start_camera(cam_index: int = 0, width: Optional[int] = None, height: Optional[int] = None) -> None:
+def start_camera(
+    cam_index: int = 0,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    fps: Optional[int] = None,
+) -> None:
     """
     Starts the camera thread if it isn't already running.
     Safe to call multiple times.
@@ -73,7 +85,7 @@ def start_camera(cam_index: int = 0, width: Optional[int] = None, height: Option
         _stop_event.clear()
         _camera_thread = threading.Thread(
             target=_camera_loop,
-            args=(cam_index, width, height),
+            args=(cam_index, width, height, fps),
             daemon=True,
         )
         _camera_thread.start()
