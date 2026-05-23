@@ -6,7 +6,7 @@ class _UnavailableArm:
     def __init__(self, error: Exception):
         self.error = error
 
-    def moveJetArm(self, servo_id, target_position):
+    def moveJetArm(self, servo_id, target_position, duration=1.0):
         raise RuntimeError("JetArm hardware is unavailable in this environment") from self.error
 
 
@@ -177,7 +177,7 @@ class JetArmGripper:
         self.Arm.moveJetArm(5, wrist_pulse)
 
     def close_gripper(self):
-        self.Arm.moveJetArm(10, self.closeGripperPulse)
+        self.Arm.moveJetArm(10, self.closeGripperPulse, duration=0.25)
 
     def open_gripper(self):
         self.Arm.moveJetArm(10, self.openGripperPulse)
