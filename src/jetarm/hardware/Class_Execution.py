@@ -177,7 +177,7 @@ class JetArmGripper:
         self.Arm.moveJetArm(5, wrist_pulse)
 
     def close_gripper(self):
-        self.Arm.moveJetArm(10, self.closeGripperPulse, duration=0.25)
+        self.Arm.moveJetArm(10, self.closeGripperPulse)
 
     def open_gripper(self):
         self.Arm.moveJetArm(10, self.openGripperPulse)
