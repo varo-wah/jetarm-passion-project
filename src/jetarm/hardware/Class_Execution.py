@@ -202,6 +202,9 @@ class UserFriendlyMode:
     POSE_DELAY = 0.7
     PERSON_FOLLOW_X_LIMIT_CM = 6.0
     PERSON_FOLLOW_SERVO4_FORWARD_PULSE = 400
+    BUTTON_APPROACH_POSE = (0, 13, 13)
+    BUTTON_PRESS_POSE = (0, 13, 12)
+    BUTTON_PRESS_HOLD = 0.45
 
     def __init__(self, ik: JetArmIK, gripper: JetArmGripper, camera: ComputerVision):
         self.Arm = Arm
@@ -309,6 +312,33 @@ class UserFriendlyMode:
 
         self.Arm.moveJetArm(4, self.PERSON_FOLLOW_SERVO4_FORWARD_PULSE)
         self.gripper.turn_wrist(90)
+        self.gripper.open_gripper()
+        return True
+
+    def press_button(self):
+        if not self._motion_allowed():
+            return False
+
+        print("[USER FRIENDLY] Press button")
+
+        if not self.ik.move_to(*self.BUTTON_APPROACH_POSE):
+            return False
+        self._wait(self.POSE_DELAY)
+
+        self.gripper.turn_wrist(90)
+        self.gripper.close_gripper()
+        self._wait(0.35)
+
+        if not self.ik.move_to(*self.BUTTON_PRESS_POSE):
+            self.gripper.open_gripper()
+            return False
+        self._wait(self.BUTTON_PRESS_HOLD)
+
+        if not self.ik.move_to(*self.BUTTON_APPROACH_POSE):
+            self.gripper.open_gripper()
+            return False
+        self._wait(0.35)
+
         self.gripper.open_gripper()
         return True
 

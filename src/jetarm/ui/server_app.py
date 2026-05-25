@@ -352,6 +352,7 @@ def api_cmd(cmd: dict = Body(...)):
             "look_around": ufm.look_around,
             "hello_wave": ufm.hello_wave,
             "curious_idle": ufm.curious_idle,
+            "press_button": ufm.press_button,
         }
         if ctype in friendly_commands:
             if _scanner_is_running():

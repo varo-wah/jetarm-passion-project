@@ -419,6 +419,9 @@
                 <button class="btn btn-primary" id="btnHelloWave">Hello Wave</button>
                 <button class="btn btn-primary" id="btnCuriousIdle">Curious Idle</button>
               </div>
+              <div class="row" style="margin-top:8px">
+                <button class="btn btn-warn" id="btnPressButton">Press Button</button>
+              </div>
               <div class="hint">Person follow uses the camera and only shifts the arm left/right at scan height. The backend blocks it while the scanner is running.</div>
             </div>
           </div>
@@ -669,6 +672,7 @@
       $("btnLookAround").onclick = async () => runFriendlyMode("look_around", "Look around");
       $("btnHelloWave").onclick = async () => runFriendlyMode("hello_wave", "Hello wave");
       $("btnCuriousIdle").onclick = async () => runFriendlyMode("curious_idle", "Curious idle");
+      $("btnPressButton").onclick = async () => runFriendlyMode("press_button", "Press button");
 
       $("btnLeft").onclick = async () => { try { await postJoystick(-stepValCm(), 0, 0); } catch(e){ alert(`Jog failed: ${e.message}`); } };
       $("btnRight").onclick = async () => { try { await postJoystick(stepValCm(), 0, 0); } catch(e){ alert(`Jog failed: ${e.message}`); } };
