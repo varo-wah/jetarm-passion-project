@@ -378,6 +378,7 @@
               <div class="kv">
                 <div>Sort count</div><div class="v" id="countText">--</div>
                 <div>Scanner</div><div class="v" id="scannerText2">--</div>
+                <div>Person follow</div><div class="v" id="personFollowText">--</div>
                 <div>Jog target</div><div class="v" id="jogText">--</div>
                 <div>Last error</div><div class="v" id="errText">--</div>
               </div>
@@ -407,6 +408,10 @@
             <div class="panel">
               <div class="title">User-Friendly Mode</div>
               <div class="row">
+                <button class="btn btn-good" id="btnPersonFollowStart">Start Person Follow</button>
+                <button class="btn btn-danger" id="btnPersonFollowStop">Stop Follow</button>
+              </div>
+              <div class="row" style="margin-top:8px">
                 <button class="btn btn-primary" id="btnIdlePose">Idle Pose</button>
                 <button class="btn btn-primary" id="btnLookAround">Look Around</button>
               </div>
@@ -414,7 +419,7 @@
                 <button class="btn btn-primary" id="btnHelloWave">Hello Wave</button>
                 <button class="btn btn-primary" id="btnCuriousIdle">Curious Idle</button>
               </div>
-              <div class="hint">Manual demo motions only. The backend blocks these while the scanner is running.</div>
+              <div class="hint">Person follow uses the camera and only shifts the arm left/right at scan height. The backend blocks it while the scanner is running.</div>
             </div>
           </div>
         </aside>
@@ -556,6 +561,12 @@
         return await res.json();
       }
 
+      async function postPersonFollow(path){
+        const res = await fetch(path, {method:"POST"});
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+        return await res.json();
+      }
+
       async function fireImmediateCmd(button, type, sentText){
         const originalText = button.textContent;
         button.disabled = true;
@@ -646,6 +657,14 @@
       $("btnHome").onclick = async () => { try { await postCmd("home", {}); } catch(e){ alert(`Scan pose failed: ${e.message}`); } };
       $("btnGripOpen").onclick = async () => { try { await postCmd("open_gripper", {}); } catch(e){ alert(`Open gripper failed: ${e.message}`); } };
       $("btnGripClose").onclick = async () => { try { await postCmd("close_gripper", {}); } catch(e){ alert(`Close gripper failed: ${e.message}`); } };
+      $("btnPersonFollowStart").onclick = async () => {
+        try { await postPersonFollow("/api/person_follow/start"); }
+        catch(e){ alert(`Start person follow failed: ${e.message}`); }
+      };
+      $("btnPersonFollowStop").onclick = async () => {
+        try { await postPersonFollow("/api/person_follow/stop"); }
+        catch(e){ alert(`Stop person follow failed: ${e.message}`); }
+      };
       $("btnIdlePose").onclick = async () => runFriendlyMode("idle_pose", "Idle pose");
       $("btnLookAround").onclick = async () => runFriendlyMode("look_around", "Look around");
       $("btnHelloWave").onclick = async () => runFriendlyMode("hello_wave", "Hello wave");
@@ -682,6 +701,7 @@
           $("errText").textContent = s.last_error ?? "--";
           $("serverTime").textContent = s.server_time ?? "--";
           setScannerText(!!s.scanner_running);
+          $("personFollowText").textContent = s.person_follow_running ? "RUNNING" : "OFF";
 
           if (Number.isFinite(Number(s.joy_speed))) joySpeed = Number(s.joy_speed);
 

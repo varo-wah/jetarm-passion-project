@@ -5,6 +5,7 @@ from typing import Generator
 import sys
 import signal
 import subprocess
+import threading
 from pathlib import Path
 
 import cv2
@@ -155,13 +156,101 @@ _status = {
 _scanner_proc: subprocess.Popen | None = None
 SCANNER_MODULE = "jetarm.sorting.Vision_Scanner"
 
+PERSON_FOLLOW_CONFIDENCE = 0.45
+PERSON_FOLLOW_DEADZONE_PX = 70
+PERSON_FOLLOW_STEP_CM = 1.0
+PERSON_FOLLOW_MAX_X_CM = 6.0
+PERSON_FOLLOW_INTERVAL_SEC = 0.45
+PERSON_FOLLOW_INVERT_X = False
+
+_person_follow_thread: threading.Thread | None = None
+_person_follow_stop = threading.Event()
+_person_follow_x_cm = 0.0
+
 
 def _scanner_is_running() -> bool:
     return _scanner_proc is not None and _scanner_proc.poll() is None
 
 
+def _person_follow_is_running() -> bool:
+    return _person_follow_thread is not None and _person_follow_thread.is_alive()
+
+
+def _request_person_follow_stop() -> None:
+    _person_follow_stop.set()
+
+
+def _person_follow_loop() -> None:
+    global _person_follow_x_cm
+
+    from jetarm.vision.person_detector import choose_person, detect_people
+
+    _person_follow_x_cm = 0.0
+    _status["state"] = "PERSON_FOLLOW"
+    _status["last_action"] = "person_follow_start"
+    _status["last_error"] = "--"
+
+    try:
+        if not ufm.person_follow_pose(_person_follow_x_cm):
+            _status["last_error"] = "Person follow failed to enter safe pose"
+            return
+
+        while not _person_follow_stop.is_set():
+            if _scanner_is_running():
+                _status["last_error"] = "Person follow stopped because scanner is running"
+                return
+
+            frame = get_latest_frame_copy()
+            if frame is None:
+                _status["last_detection"] = "person: no frame"
+                _person_follow_stop.wait(0.1)
+                continue
+
+            people = detect_people(frame, min_confidence=PERSON_FOLLOW_CONFIDENCE)
+            target = choose_person(people)
+            if target is None:
+                _status["last_detection"] = "person: none"
+                _person_follow_stop.wait(PERSON_FOLLOW_INTERVAL_SEC)
+                continue
+
+            frame_width = frame.shape[1]
+            center_x = int(target["center_x"])
+            error_px = center_x - (frame_width / 2.0)
+            confidence = float(target["confidence"])
+            _status["last_detection"] = f"person x={center_x} err={error_px:.0f}px conf={confidence:.2f}"
+
+            if abs(error_px) > PERSON_FOLLOW_DEADZONE_PX:
+                direction = 1.0 if error_px > 0 else -1.0
+                if PERSON_FOLLOW_INVERT_X:
+                    direction *= -1.0
+
+                _person_follow_x_cm += direction * PERSON_FOLLOW_STEP_CM
+                _person_follow_x_cm = _clamp(
+                    _person_follow_x_cm,
+                    -PERSON_FOLLOW_MAX_X_CM,
+                    PERSON_FOLLOW_MAX_X_CM,
+                )
+
+                ok = ufm.person_follow_pose(_person_follow_x_cm)
+                if not ok:
+                    _status["last_error"] = "Person follow motion failed or was blocked"
+                    return
+
+            _person_follow_stop.wait(PERSON_FOLLOW_INTERVAL_SEC)
+
+    except Exception as exc:
+        _status["last_error"] = str(exc)
+    finally:
+        if not _scanner_is_running() and _status.get("state") == "PERSON_FOLLOW":
+            _status["state"] = "IDLE"
+        _person_follow_stop.set()
+
+
 @app.post("/api/joystick")
 def joystick(cmd: dict = Body(...)):
+    if _person_follow_is_running():
+        return JSONResponse({"ok": False, "error": "Stop person follow before jogging"}, status_code=409)
+
     dx = float(cmd.get("dx", 0))
     dy = float(cmd.get("dy", 0))
     dz = float(cmd.get("dz", 0))
@@ -190,6 +279,9 @@ def joystick(cmd: dict = Body(...)):
 
 @app.post("/api/joystick/reset")
 def joystick_reset():
+    if _person_follow_is_running():
+        return JSONResponse({"ok": False, "error": "Stop person follow before resetting jog"}, status_code=409)
+
     # Reset to your preferred “safe jog pose”
     joy_target["x"] = 0.0
     joy_target["y"] = 15.0
@@ -212,6 +304,7 @@ def api_status():
     payload = dict(_status)
     payload["server_time"] = datetime.now().strftime("%H:%M:%S")
     payload["scanner_running"] = _scanner_is_running()
+    payload["person_follow_running"] = _person_follow_is_running()
 
     # Expose joystick config/state for the UI
     payload["joy_speed"] = JOY_SPEED
@@ -227,6 +320,9 @@ def api_cmd(cmd: dict = Body(...)):
 
     try:
         if ctype == "goto":
+            if _person_follow_is_running():
+                return JSONResponse({"ok": False, "error": "Stop person follow before manual movement"}, status_code=409)
+
             x = float(cmd["x"])
             y = float(cmd["y"])
             z = float(cmd["z"])
@@ -237,6 +333,9 @@ def api_cmd(cmd: dict = Body(...)):
             return JSONResponse({"ok": True})
 
         if ctype == "home":
+            if _person_follow_is_running():
+                return JSONResponse({"ok": False, "error": "Stop person follow before scan pose"}, status_code=409)
+
             camera.scan_position()
             return JSONResponse({"ok": True})
 
@@ -258,6 +357,9 @@ def api_cmd(cmd: dict = Body(...)):
             if _scanner_is_running():
                 _status["last_error"] = "User-friendly mode blocked while scanner is running"
                 return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=409)
+            if _person_follow_is_running():
+                _status["last_error"] = "User-friendly command blocked while person follow is running"
+                return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=409)
 
             ok = friendly_commands[ctype]()
             if not ok:
@@ -268,16 +370,19 @@ def api_cmd(cmd: dict = Body(...)):
             return JSONResponse({"ok": True})
 
         if ctype == "stop":
+            _request_person_follow_stop()
             stop_motion()
             _status["state"] = "STOPPED"
             return JSONResponse({"ok": True})
 
         if ctype == "estop":
+            _request_person_follow_stop()
             estop_motion()
             _status["state"] = "ESTOP"
             return JSONResponse({"ok": True})
 
         if ctype == "pause":
+            _request_person_follow_stop()
             pause_system()
             _status["state"] = "PAUSED"
             return JSONResponse({"ok": True})
@@ -297,9 +402,59 @@ def api_cmd(cmd: dict = Body(...)):
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
+@app.post("/api/person_follow/start")
+def person_follow_start():
+    global _person_follow_thread
+
+    if _scanner_is_running():
+        _status["last_error"] = "Cannot start person follow while scanner is running"
+        return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=409)
+
+    if _person_follow_is_running():
+        return JSONResponse({"ok": True, "running": True, "note": "Person follow already running"})
+
+    _person_follow_stop.clear()
+    _person_follow_thread = threading.Thread(
+        target=_person_follow_loop,
+        name="person-follow",
+        daemon=True,
+    )
+    _person_follow_thread.start()
+
+    _status["state"] = "PERSON_FOLLOW"
+    _status["last_action"] = "person_follow_start"
+    _status["last_error"] = "--"
+    return JSONResponse({"ok": True, "running": True})
+
+
+@app.post("/api/person_follow/stop")
+def person_follow_stop():
+    global _person_follow_thread
+
+    if not _person_follow_is_running():
+        _person_follow_thread = None
+        _status["last_action"] = "person_follow_stop"
+        if not _scanner_is_running():
+            _status["state"] = "IDLE"
+        return JSONResponse({"ok": True, "running": False, "note": "Person follow not running"})
+
+    _request_person_follow_stop()
+    _person_follow_thread.join(timeout=1.5)
+    if not _person_follow_thread.is_alive():
+        _person_follow_thread = None
+
+    _status["state"] = "IDLE"
+    _status["last_action"] = "person_follow_stop"
+    return JSONResponse({"ok": True, "running": _person_follow_is_running()})
+
+
 @app.post("/api/scanner/start")
 def scanner_start():
     global _scanner_proc
+
+    if _person_follow_is_running():
+        _status["last_error"] = "Stop person follow before starting scanner"
+        return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=409)
 
     # already running
     if _scanner_is_running():

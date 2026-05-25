@@ -200,6 +200,8 @@ class ComputerVision:
 class UserFriendlyMode:
     STEP_DELAY = 0.45
     POSE_DELAY = 0.7
+    PERSON_FOLLOW_X_LIMIT_CM = 6.0
+    PERSON_FOLLOW_SERVO4_FORWARD_PULSE = 400
 
     def __init__(self, ik: JetArmIK, gripper: JetArmGripper, camera: ComputerVision):
         self.Arm = Arm
@@ -290,6 +292,23 @@ class UserFriendlyMode:
             self.gripper.turn_wrist(90)
             self._wait()
 
+        self.gripper.open_gripper()
+        return True
+
+    def person_follow_pose(self, x_offset_cm):
+        if not self._motion_allowed():
+            return False
+
+        x_offset_cm = max(
+            -self.PERSON_FOLLOW_X_LIMIT_CM,
+            min(self.PERSON_FOLLOW_X_LIMIT_CM, float(x_offset_cm)),
+        )
+        ok = self.ik.move_to_wrist(x_offset_cm, 15, 23)
+        if not ok:
+            return False
+
+        self.Arm.moveJetArm(4, self.PERSON_FOLLOW_SERVO4_FORWARD_PULSE)
+        self.gripper.turn_wrist(90)
         self.gripper.open_gripper()
         return True
 
