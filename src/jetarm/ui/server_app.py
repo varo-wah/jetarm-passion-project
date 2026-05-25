@@ -154,7 +154,11 @@ _status = {
 }
 
 _scanner_proc: subprocess.Popen | None = None
+_scanner_monitor_thread: threading.Thread | None = None
+_scanner_autocycle_enabled = False
+_scanner_lock = threading.Lock()
 SCANNER_MODULE = "jetarm.sorting.Vision_Scanner"
+SCANNER_RESTART_DELAY_SEC = 0.5
 
 PERSON_FOLLOW_CONFIDENCE = 0.45
 PERSON_FOLLOW_DEADZONE_PX = 70
@@ -170,6 +174,97 @@ _person_follow_x_cm = 0.0
 
 def _scanner_is_running() -> bool:
     return _scanner_proc is not None and _scanner_proc.poll() is None
+
+
+def _launch_scanner_process_unlocked() -> subprocess.Popen:
+    env = os.environ.copy()
+
+    # IMPORTANT: force Vision_Scanner to use THIS server for frames (no camera conflict)
+    env["UI_SERVER"] = "http://127.0.0.1:8000"
+
+    return subprocess.Popen(
+        [sys.executable, "-m", SCANNER_MODULE],
+        cwd=str(Path(__file__).resolve().parents[3]),
+        env=env,
+    )
+
+
+def _scanner_autocycle_loop() -> None:
+    global _scanner_proc, _scanner_autocycle_enabled
+
+    while True:
+        with _scanner_lock:
+            proc = _scanner_proc
+            autocycle_enabled = _scanner_autocycle_enabled
+
+        if not autocycle_enabled or proc is None:
+            return
+
+        exit_code = proc.wait()
+
+        with _scanner_lock:
+            if _scanner_proc is proc:
+                _scanner_proc = None
+            autocycle_enabled = _scanner_autocycle_enabled
+
+        if not autocycle_enabled:
+            if _status.get("state") == "SCANNER_RUNNING":
+                _status["state"] = "IDLE"
+            return
+
+        if exit_code != 0:
+            with _scanner_lock:
+                _scanner_autocycle_enabled = False
+            _status["state"] = "SCANNER_ERROR"
+            _status["last_action"] = "scanner_exited"
+            _status["last_error"] = f"Vision_Scanner exited with code {exit_code}; auto-cycle stopped"
+            return
+
+        _status["state"] = "PRESSING_BUTTON"
+        _status["last_action"] = "scanner_done_press_button"
+        _status["last_error"] = "--"
+
+        ok = ufm.press_button()
+        if not ok:
+            with _scanner_lock:
+                _scanner_autocycle_enabled = False
+            _status["state"] = "IDLE"
+            _status["last_error"] = "Button press failed after scanner finished; auto-cycle stopped"
+            return
+
+        time.sleep(SCANNER_RESTART_DELAY_SEC)
+
+        with _scanner_lock:
+            if not _scanner_autocycle_enabled:
+                _status["state"] = "IDLE"
+                return
+
+            _scanner_proc = _launch_scanner_process_unlocked()
+
+        _status["state"] = "SCANNER_RUNNING"
+        _status["last_action"] = "scanner_restart"
+        _status["last_error"] = "--"
+
+
+def _ensure_scanner_monitor() -> None:
+    global _scanner_monitor_thread
+
+    if _scanner_monitor_thread is not None and _scanner_monitor_thread.is_alive():
+        return
+
+    _scanner_monitor_thread = threading.Thread(
+        target=_scanner_autocycle_loop,
+        name="scanner-autocycle",
+        daemon=True,
+    )
+    _scanner_monitor_thread.start()
+
+
+def _request_scanner_autocycle_stop() -> None:
+    global _scanner_autocycle_enabled
+
+    with _scanner_lock:
+        _scanner_autocycle_enabled = False
 
 
 def _person_follow_is_running() -> bool:
@@ -304,6 +399,7 @@ def api_status():
     payload = dict(_status)
     payload["server_time"] = datetime.now().strftime("%H:%M:%S")
     payload["scanner_running"] = _scanner_is_running()
+    payload["scanner_autocycle_enabled"] = _scanner_autocycle_enabled
     payload["person_follow_running"] = _person_follow_is_running()
 
     # Expose joystick config/state for the UI
@@ -372,18 +468,21 @@ def api_cmd(cmd: dict = Body(...)):
 
         if ctype == "stop":
             _request_person_follow_stop()
+            _request_scanner_autocycle_stop()
             stop_motion()
             _status["state"] = "STOPPED"
             return JSONResponse({"ok": True})
 
         if ctype == "estop":
             _request_person_follow_stop()
+            _request_scanner_autocycle_stop()
             estop_motion()
             _status["state"] = "ESTOP"
             return JSONResponse({"ok": True})
 
         if ctype == "pause":
             _request_person_follow_stop()
+            _request_scanner_autocycle_stop()
             pause_system()
             _status["state"] = "PAUSED"
             return JSONResponse({"ok": True})
@@ -451,57 +550,67 @@ def person_follow_stop():
 
 @app.post("/api/scanner/start")
 def scanner_start():
-    global _scanner_proc
+    global _scanner_proc, _scanner_autocycle_enabled
 
     if _person_follow_is_running():
         _status["last_error"] = "Stop person follow before starting scanner"
         return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=409)
 
-    # already running
-    if _scanner_is_running():
-        _status["last_action"] = "scanner_start"
-        return JSONResponse({"ok": True, "running": True, "note": "Vision_Scanner already running"})
+    with _scanner_lock:
+        _scanner_autocycle_enabled = True
 
-    env = os.environ.copy()
+        # already running
+        if _scanner_proc is not None and _scanner_proc.poll() is None:
+            _status["last_action"] = "scanner_start"
+            _ensure_scanner_monitor()
+            return JSONResponse({
+                "ok": True,
+                "running": True,
+                "autocycle": True,
+                "note": "Vision_Scanner already running",
+            })
 
-    # IMPORTANT: force Vision_Scanner to use THIS server for frames (no camera conflict)
-    env["UI_SERVER"] = "http://127.0.0.1:8000"
+        _scanner_proc = _launch_scanner_process_unlocked()
 
-    _scanner_proc = subprocess.Popen(
-        [sys.executable, "-m", SCANNER_MODULE],
-        cwd=str(Path(__file__).resolve().parents[3]),
-        env=env,
-    )
+    _ensure_scanner_monitor()
 
     _status["state"] = "SCANNER_RUNNING"
     _status["last_action"] = "scanner_start"
     _status["last_error"] = "--"
-    return JSONResponse({"ok": True, "running": True})
+    return JSONResponse({"ok": True, "running": True, "autocycle": True})
 
 
 @app.post("/api/scanner/stop")
 def scanner_stop():
-    global _scanner_proc
+    global _scanner_proc, _scanner_autocycle_enabled
 
-    if not _scanner_is_running():
-        _scanner_proc = None
+    with _scanner_lock:
+        _scanner_autocycle_enabled = False
+        proc = _scanner_proc
+
+    if proc is None or proc.poll() is not None:
+        with _scanner_lock:
+            if _scanner_proc is proc:
+                _scanner_proc = None
         _status["last_action"] = "scanner_stop"
         _status["state"] = "IDLE"
         return JSONResponse({"ok": True, "running": False, "note": "Vision_Scanner not running"})
 
     try:
-        _scanner_proc.send_signal(signal.SIGINT)
+        proc.send_signal(signal.SIGINT)
         try:
-            _scanner_proc.wait(timeout=3.0)
+            proc.wait(timeout=3.0)
         except subprocess.TimeoutExpired:
-            _scanner_proc.terminate()
-            _scanner_proc.wait(timeout=2.0)
+            proc.terminate()
+            proc.wait(timeout=2.0)
     finally:
-        _scanner_proc = None
+        with _scanner_lock:
+            if _scanner_proc is proc:
+                _scanner_proc = None
 
     _status["state"] = "IDLE"
     _status["last_action"] = "scanner_stop"
-    return JSONResponse({"ok": True, "running": False})
+    return JSONResponse({"ok": True, "running": False, "autocycle": False})
 
 
 @app.get("/api/frame.jpg")

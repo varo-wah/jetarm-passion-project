@@ -387,10 +387,10 @@
             <div class="panel">
               <div class="title">Scanner</div>
               <div class="row">
-                <button class="btn btn-good" id="btnScannerStart">Start YOLO Scanner</button>
+                <button class="btn btn-good" id="btnScannerStart">Start Scanner Cycle</button>
                 <button class="btn btn-danger" id="btnScannerStop">Stop Scanner</button>
               </div>
-              <div class="hint">Start runs the YOLO-backed full pick/drop Vision_Scanner.</div>
+              <div class="hint">Runs YOLO sorting, presses the button when finished, then restarts until stopped.</div>
             </div>
 
             <div class="panel">
@@ -637,7 +637,6 @@
       };
 
       $("btnScannerStart").onclick = async () => {
-        if (!confirm("Start YOLO full pick/drop scanner?")) return;
         try { await postScanner("/api/scanner/start"); }
         catch(e){ alert(`Start scanner failed: ${e.message}`); }
       };
