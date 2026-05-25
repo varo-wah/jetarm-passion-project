@@ -403,6 +403,19 @@
                 <button class="btn btn-danger" id="btnEstop">E-Stop</button>
               </div>
             </div>
+
+            <div class="panel">
+              <div class="title">User-Friendly Mode</div>
+              <div class="row">
+                <button class="btn btn-primary" id="btnIdlePose">Idle Pose</button>
+                <button class="btn btn-primary" id="btnLookAround">Look Around</button>
+              </div>
+              <div class="row" style="margin-top:8px">
+                <button class="btn btn-primary" id="btnHelloWave">Hello Wave</button>
+                <button class="btn btn-primary" id="btnCuriousIdle">Curious Idle</button>
+              </div>
+              <div class="hint">Manual demo motions only. The backend blocks these while the scanner is running.</div>
+            </div>
           </div>
         </aside>
       </div>
@@ -560,6 +573,14 @@
         }
       }
 
+      async function runFriendlyMode(type, label){
+        try {
+          await postCmd(type, {});
+        } catch(e) {
+          alert(`${label} failed: ${e.message}`);
+        }
+      }
+
       function numOrNull(v){
         const n = Number(v);
         return Number.isFinite(n) ? n : null;
@@ -625,6 +646,10 @@
       $("btnHome").onclick = async () => { try { await postCmd("home", {}); } catch(e){ alert(`Scan pose failed: ${e.message}`); } };
       $("btnGripOpen").onclick = async () => { try { await postCmd("open_gripper", {}); } catch(e){ alert(`Open gripper failed: ${e.message}`); } };
       $("btnGripClose").onclick = async () => { try { await postCmd("close_gripper", {}); } catch(e){ alert(`Close gripper failed: ${e.message}`); } };
+      $("btnIdlePose").onclick = async () => runFriendlyMode("idle_pose", "Idle pose");
+      $("btnLookAround").onclick = async () => runFriendlyMode("look_around", "Look around");
+      $("btnHelloWave").onclick = async () => runFriendlyMode("hello_wave", "Hello wave");
+      $("btnCuriousIdle").onclick = async () => runFriendlyMode("curious_idle", "Curious idle");
 
       $("btnLeft").onclick = async () => { try { await postJoystick(-stepValCm(), 0, 0); } catch(e){ alert(`Jog failed: ${e.message}`); } };
       $("btnRight").onclick = async () => { try { await postJoystick(stepValCm(), 0, 0); } catch(e){ alert(`Jog failed: ${e.message}`); } };

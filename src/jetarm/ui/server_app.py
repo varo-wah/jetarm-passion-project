@@ -16,7 +16,7 @@ from jetarm.ui.camera_worker import get_latest_frame_copy, start_camera
 
 # Robot control (manual moves/gripper/home)
 from jetarm.hardware.Class_Execution import (
-    ik, gripper, camera,
+    ik, gripper, camera, ufm,
     stop_motion, estop_motion,
     pause_system, resume_system
 )
@@ -156,6 +156,10 @@ _scanner_proc: subprocess.Popen | None = None
 SCANNER_MODULE = "jetarm.sorting.Vision_Scanner"
 
 
+def _scanner_is_running() -> bool:
+    return _scanner_proc is not None and _scanner_proc.poll() is None
+
+
 @app.post("/api/joystick")
 def joystick(cmd: dict = Body(...)):
     dx = float(cmd.get("dx", 0))
@@ -207,7 +211,7 @@ def joystick_reset():
 def api_status():
     payload = dict(_status)
     payload["server_time"] = datetime.now().strftime("%H:%M:%S")
-    payload["scanner_running"] = (_scanner_proc is not None and _scanner_proc.poll() is None)
+    payload["scanner_running"] = _scanner_is_running()
 
     # Expose joystick config/state for the UI
     payload["joy_speed"] = JOY_SPEED
@@ -242,6 +246,25 @@ def api_cmd(cmd: dict = Body(...)):
 
         if ctype == "close_gripper":
             gripper.close_gripper()
+            return JSONResponse({"ok": True})
+
+        friendly_commands = {
+            "idle_pose": ufm.idle_pose,
+            "look_around": ufm.look_around,
+            "hello_wave": ufm.hello_wave,
+            "curious_idle": ufm.curious_idle,
+        }
+        if ctype in friendly_commands:
+            if _scanner_is_running():
+                _status["last_error"] = "User-friendly mode blocked while scanner is running"
+                return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=409)
+
+            ok = friendly_commands[ctype]()
+            if not ok:
+                _status["last_error"] = "User-friendly motion failed or was blocked"
+                return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=400)
+
+            _status["state"] = "IDLE"
             return JSONResponse({"ok": True})
 
         if ctype == "stop":
@@ -279,7 +302,7 @@ def scanner_start():
     global _scanner_proc
 
     # already running
-    if _scanner_proc is not None and _scanner_proc.poll() is None:
+    if _scanner_is_running():
         _status["last_action"] = "scanner_start"
         return JSONResponse({"ok": True, "running": True, "note": "Vision_Scanner already running"})
 
@@ -304,7 +327,7 @@ def scanner_start():
 def scanner_stop():
     global _scanner_proc
 
-    if _scanner_proc is None or _scanner_proc.poll() is not None:
+    if not _scanner_is_running():
         _scanner_proc = None
         _status["last_action"] = "scanner_stop"
         _status["state"] = "IDLE"

@@ -25,8 +25,8 @@ class CKMJetArm:
         self.pub = self.node.create_publisher(ServosPosition, '/ros_robot_controller/bus_servo/set_position', 10)
         time.sleep(0.5)
 
-    def moveJetArm(self, servo_id, target_position, duration=1.0): 
-        self.pub.publish(ServosPosition(duration=duration, position=[ServoPosition(id=servo_id, position=target_position)]))
+    def moveJetArm(self, servo_id, target_position):
+        self.pub.publish(ServosPosition(duration=1.0, position=[ServoPosition(id=servo_id, position=target_position)]))
         print(f"✅ Command sent to servo {servo_id} → position {target_position}")
         time.sleep(0.1)
             

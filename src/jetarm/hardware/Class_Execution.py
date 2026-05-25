@@ -1,4 +1,5 @@
 import math
+import time
 
 from jetarm.hardware.classCreation import CKMJetArm
 
@@ -6,7 +7,7 @@ class _UnavailableArm:
     def __init__(self, error: Exception):
         self.error = error
 
-    def moveJetArm(self, servo_id, target_position, duration=1.0):
+    def moveJetArm(self, servo_id, target_position):
         raise RuntimeError("JetArm hardware is unavailable in this environment") from self.error
 
 
@@ -197,11 +198,35 @@ class ComputerVision:
 
 
 class UserFriendlyMode:
+    STEP_DELAY = 0.45
+    POSE_DELAY = 0.7
+
     def __init__(self, ik: JetArmIK, gripper: JetArmGripper, camera: ComputerVision):
         self.Arm = Arm
         self.ik = ik
         self.gripper = gripper
         self.camera = camera
+
+    def _motion_allowed(self):
+        if ESTOP_LATCHED:
+            print("[USER FRIENDLY] E-STOP active: motion blocked")
+            return False
+        if PAUSED:
+            print("[USER FRIENDLY] Paused: motion blocked")
+            return False
+        return True
+
+    def _wait(self, seconds=None):
+        time.sleep(self.STEP_DELAY if seconds is None else seconds)
+
+    def _forward_scan_height_pose(self):
+        ok = self.ik.move_to_wrist(0, 15, 23)
+        if not ok:
+            return False
+        self.gripper.turn_wrist(90)
+        self.gripper.open_gripper()
+        self._wait(self.POSE_DELAY)
+        return True
 
     def dummy_position(self):
         self.Arm.moveJetArm(1, 500)
@@ -211,8 +236,65 @@ class UserFriendlyMode:
         self.gripper.turn_wrist(90)
         self.gripper.open_gripper()
 
+    def idle_pose(self):
+        if not self._motion_allowed():
+            return False
+
+        print("[USER FRIENDLY] Idle pose")
+        return self._forward_scan_height_pose()
+
+    def look_around(self):
+        if not self._motion_allowed():
+            return False
+
+        print("[USER FRIENDLY] Look around")
+        for x in (-4, 4, 0):
+            if not self._motion_allowed():
+                return False
+            ok = self.ik.move_to_wrist(x, 15, 23)
+            if not ok:
+                return False
+            self.gripper.turn_wrist(90)
+            self._wait()
+        return True
+
+    def hello_wave(self):
+        if not self._motion_allowed():
+            return False
+
+        print("[USER FRIENDLY] Hello wave")
+        if not self._forward_scan_height_pose():
+            return False
+
+        for x, wrist_angle in ((-2, 65), (2, 115), (-2, 65), (2, 115), (0, 90)):
+            if not self._motion_allowed():
+                return False
+            ok = self.ik.move_to_wrist(x, 15, 23)
+            if not ok:
+                return False
+            self.gripper.turn_wrist(wrist_angle)
+            self._wait(0.35)
+        return True
+
+    def curious_idle(self):
+        if not self._motion_allowed():
+            return False
+
+        print("[USER FRIENDLY] Curious idle")
+        for x, y, z_wrist in ((-3, 15, 24), (3, 15, 24), (0, 14, 23), (0, 15, 23)):
+            if not self._motion_allowed():
+                return False
+            ok = self.ik.move_to_wrist(x, y, z_wrist)
+            if not ok:
+                return False
+            self.gripper.turn_wrist(90)
+            self._wait()
+
+        self.gripper.open_gripper()
+        return True
+
     def idle_mode(self):
-        self.Arm.moveJetArm(3, 500)
+        return self.idle_pose()
 
 
 
