@@ -9,6 +9,12 @@ class _UnavailableArm:
     def moveJetArm(self, servo_id, target_position):
         raise RuntimeError("JetArm hardware is unavailable in this environment") from self.error
 
+    def moveJetArmGroup(self, positions, duration=1.0):
+        raise RuntimeError("JetArm hardware is unavailable in this environment") from self.error
+
+    def smoothMoveJetArmGroup(self, positions, duration=1.2, steps=24):
+        raise RuntimeError("JetArm hardware is unavailable in this environment") from self.error
+
 
 # Instantiate hardware once per process when ROS is available.
 try:
@@ -126,11 +132,17 @@ class JetArmIK:
                 print(f"❌ Joint limit: {name} pulse={p} (x={x:.1f}, y={y:.1f}, z_wrist={z_wrist:.1f})")
                 return False
 
-        print(f"Moving to: {pulses['base']}, {pulses['L1']}, {pulses['L2']}, {pulses['L3']}")
-        self.Arm.moveJetArm(1, pulses["base"])
-        self.Arm.moveJetArm(2, pulses["L1"])
-        self.Arm.moveJetArm(3, pulses["L2"])
-        self.Arm.moveJetArm(4, pulses["L3"])
+        print(f"Smooth moving to: {pulses['base']}, {pulses['L1']}, {pulses['L2']}, {pulses['L3']}")
+        self.Arm.smoothMoveJetArmGroup(
+            {
+                1: pulses["base"],
+                2: pulses["L1"],
+                3: pulses["L2"],
+                4: pulses["L3"],
+            },
+            duration=1.2,
+            steps=24,
+        )
         return True
 
     def move_to_wrist(self, x, y, z_wrist):
@@ -204,10 +216,7 @@ class UserFriendlyMode:
         self.camera = camera
 
     def dummy_position(self):
-        self.Arm.moveJetArm(1, 500)
-        self.Arm.moveJetArm(2, 750)
-        self.Arm.moveJetArm(3, 350)
-        self.Arm.moveJetArm(4, 400)
+        self.Arm.smoothMoveJetArmGroup({1: 500, 2: 750, 3: 350, 4: 400}, duration=1.2)
         self.gripper.turn_wrist(90)
         self.gripper.open_gripper()
 
