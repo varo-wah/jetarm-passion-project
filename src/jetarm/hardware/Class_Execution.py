@@ -164,7 +164,7 @@ class JetArmGripper:
         self.Arm = Arm
         self.ik = ik
         self.openGripperPulse = 150
-        self.closeGripperPulse = 850
+        self.closeGripperPulse = 700
         self.BASE_ZERO_OFFSET = 125.0
         self.DEG_PER_PULSE = 0.24
 
@@ -202,9 +202,17 @@ class UserFriendlyMode:
     POSE_DELAY = 0.7
     PERSON_FOLLOW_X_LIMIT_CM = 6.0
     PERSON_FOLLOW_SERVO4_FORWARD_PULSE = 400
-    BUTTON_APPROACH_POSE = (0, 13, 13)
-    BUTTON_PRESS_POSE = (0, 13, 12)
+    BUTTON_APPROACH_POSE = (0, 11.5, 13)
+    BUTTON_PRESS_POSE = (0, 11.5, 12)
     BUTTON_PRESS_HOLD = 0.45
+    HELLO_ARC_POINTS = (
+        (0, 15.0, 23.0, 90, 0.35),
+        (0, 17.0, 24.0, 70, 0.35),
+        (0, 16.0, 22.0, 110, 0.35),
+        (0, 13.5, 24.0, 70, 0.35),
+        (0, 14.5, 22.0, 110, 0.35),
+        (0, 15.0, 23.0, 90, 0.45),
+    )
 
     def __init__(self, ik: JetArmIK, gripper: JetArmGripper, camera: ComputerVision):
         self.Arm = Arm
@@ -268,17 +276,14 @@ class UserFriendlyMode:
             return False
 
         print("[USER FRIENDLY] Hello wave")
-        if not self._forward_scan_height_pose():
-            return False
-
-        for x, wrist_angle in ((-2, 65), (2, 115), (-2, 65), (2, 115), (0, 90)):
+        for x, y, z_wrist, wrist_angle, delay in self.HELLO_ARC_POINTS:
             if not self._motion_allowed():
                 return False
-            ok = self.ik.move_to_wrist(x, 15, 23)
+            ok = self.ik.move_to_wrist(x, y, z_wrist)
             if not ok:
                 return False
             self.gripper.turn_wrist(wrist_angle)
-            self._wait(0.35)
+            self._wait(delay)
         return True
 
     def curious_idle(self):

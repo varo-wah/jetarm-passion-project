@@ -163,7 +163,7 @@ class JetArmGripper:
         self.Arm = Arm
         self.ik = ik
         self.openGripperPulse = 150
-        self.closeGripperPulse = 850
+        self.closeGripperPulse = 700
         self.BASE_ZERO_OFFSET = 125.0
         self.DEG_PER_PULSE = 0.24
 
