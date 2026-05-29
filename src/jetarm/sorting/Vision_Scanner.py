@@ -11,6 +11,7 @@ import requests
 
 from jetarm.hardware.Class_Execution import ik, gripper, camera
 from jetarm.vision.yolo_detector import detect_bricks_yolo as detect_bricks
+from jetarm.vision.wrist_safety import choose_safe_wrist_angle
 
 UI_SERVER = os.environ.get("UI_SERVER", "http://127.0.0.1:8000")
 FRAME_URL = f"{UI_SERVER}/api/frame.jpg"
@@ -147,6 +148,8 @@ def scan_once():
 
     frame = take_snapshot()
     bricks = detect_bricks(frame)
+    for brick in bricks:
+        brick["frame_shape"] = frame.shape
 
     print_bricks(bricks)
     return bricks
@@ -202,7 +205,8 @@ def clamped_separation_point(brick, neighbor):
 def separate_close_cluster(brick, neighbor, distance):
     x = float(brick["x"])
     y = float(brick["y"])
-    angle = float(brick.get("angle", 90.0))
+    detected_angle = float(brick.get("angle", 90.0))
+    angle, edge_status = choose_safe_wrist_angle(brick, brick.get("frame_shape"))
     push_x, push_y = clamped_separation_point(brick, neighbor)
 
     if float(np.hypot(push_x - x, push_y - y)) < 0.5:
@@ -221,7 +225,10 @@ def separate_close_cluster(brick, neighbor, distance):
     if not move_wait(x, y, APPROACH_Z, "[SEPARATION] APPROACH TARGET"):
         return False
 
-    print(f"[SEPARATION] ALIGN WRIST  • target angle={angle:.1f}°")
+    print(
+        "[SEPARATION] ALIGN WRIST  • "
+        f"detected={detected_angle:.1f}° final={angle:.1f}° edge={edge_status}"
+    )
     gripper.turn_wrist(angle)
     time.sleep(WRIST_SETTLE)
 
@@ -269,18 +276,19 @@ def should_separate_before_pick(brick, bricks):
 def pick_and_drop(brick):
     x = brick["x"]
     y = brick["y"]
-    angle = brick["angle"]
+    detected_angle = brick["angle"]
+    angle, edge_status = choose_safe_wrist_angle(brick, brick.get("frame_shape"))
     bx, by = bucket_for_color(brick.get("color"))
 
     stage("🎯 SELECTED BRICK",
-          f"• x={x:.2f}, y={y:.2f}, angle={angle:.1f}, color={brick['color']}")
+          f"• x={x:.2f}, y={y:.2f}, angle={detected_angle:.1f}, color={brick['color']}")
 
     # 1) Approach above brick
     if not move_wait(x, y, APPROACH_Z, "🚀 APPROACHING"):
         return False
 
     # 2) Wrist align
-    print(f"🧭 ALIGN WRIST  • target angle={angle:.1f}°")
+    print(f"🧭 ALIGN WRIST  • detected={detected_angle:.1f}° final={angle:.1f}° edge={edge_status}")
     gripper.turn_wrist(angle)
     time.sleep(WRIST_SETTLE)
 

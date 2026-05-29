@@ -244,6 +244,12 @@ def to_vision_scanner_format(detections: List[Dict[str, Any]]) -> List[Dict[str,
             "y": float(detection["robot_y"]),
             "angle": float(angle),
             "color": detection.get("color", "NEUTRAL"),
+            "center_x": detection.get("center_x"),
+            "center_y": detection.get("center_y"),
+            "x1": detection.get("x1"),
+            "y1": detection.get("y1"),
+            "x2": detection.get("x2"),
+            "y2": detection.get("y2"),
         })
 
     return bricks

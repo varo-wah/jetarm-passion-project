@@ -14,6 +14,7 @@ import requests
 
 from jetarm.hardware.Class_Execution import camera, gripper, ik
 from jetarm.vision.yolo_detector import detect_bricks_yolo, detect_objects, detect_target
+from jetarm.vision.wrist_safety import choose_safe_wrist_angle
 
 
 ENABLE_PICK_AND_DROP = False
@@ -125,6 +126,8 @@ def scan_once():
 
     print("[YOLO SCANNER] Running YOLO detection")
     bricks = detect_bricks_yolo(frame)
+    for brick in bricks:
+        brick["frame_shape"] = frame.shape
 
     print_yolo_bricks(bricks)
     return bricks
@@ -154,18 +157,22 @@ def print_selected_target(brick):
 def pick_and_drop(brick):
     x = brick["x"]
     y = brick["y"]
-    angle = brick["angle"]
+    detected_angle = brick["angle"]
+    angle, edge_status = choose_safe_wrist_angle(brick, brick.get("frame_shape"))
     bx, by = bucket_for_color(brick.get("color"))
 
     stage(
         "[YOLO SCANNER] Selected brick",
-        f"x={x:.2f}, y={y:.2f}, angle={angle:.1f}, color={brick['color']}",
+        f"x={x:.2f}, y={y:.2f}, angle={detected_angle:.1f}, color={brick['color']}",
     )
 
     if not move_wait(x, y, APPROACH_Z, "[YOLO SCANNER] Approaching"):
         return False
 
-    print(f"[YOLO SCANNER] Aligning wrist: target angle={angle:.1f}")
+    print(
+        "[YOLO SCANNER] Aligning wrist: "
+        f"detected={detected_angle:.1f} final={angle:.1f} edge={edge_status}"
+    )
     gripper.turn_wrist(angle)
     time.sleep(WRIST_SETTLE)
 

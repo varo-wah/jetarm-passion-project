@@ -6,10 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="c5566ae3-17d7-45b2-996f-ea8dad2ed037" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/jetarm/hardware/Class_Execution.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/hardware/Class_Execution.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/jetarm/hardware/arm_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/hardware/arm_controller.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/jetarm/hardware/classCreation.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/hardware/classCreation.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/jetarm/hardware/servo_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/hardware/servo_controller.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jetarm/sorting/Vision_Scanner.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/sorting/Vision_Scanner.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jetarm/sorting/yolo_vision_scanner.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/sorting/yolo_vision_scanner.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jetarm/vision/pixel_to_robot.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/vision/pixel_to_robot.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jetarm/vision/scanner.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/vision/scanner.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/jetarm/vision/yolo_detector.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/jetarm/vision/yolo_detector.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -91,7 +92,7 @@
       <workItem from="1779507949127" duration="4718000" />
       <workItem from="1779699503850" duration="7007000" />
       <workItem from="1779857919085" duration="18000" />
-      <workItem from="1779925663417" duration="3166000" />
+      <workItem from="1779925663417" duration="4482000" />
     </task>
     <servers />
   </component>
