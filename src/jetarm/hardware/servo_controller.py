@@ -26,7 +26,7 @@ class CKMJetArm:
         self._last_positions = {}
         time.sleep(0.5)
 
-    def moveJetArm(self, servo_id, target_position, duration=1.0): 
+    def moveJetArm(self, servo_id, target_position, duration=1.0):
         self.moveJetArmGroup({servo_id: target_position}, duration=duration)
         print(f"✅ Command sent to servo {servo_id} → position {target_position}")
         time.sleep(0.1)
