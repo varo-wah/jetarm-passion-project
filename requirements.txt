@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+opencv-python
+numpy
+requests
+ultralytics
+
+# ROS 2 dependencies are installed through the JetArm ROS environment:
+# rclpy
+# sensor_msgs
+# cv_bridge
+# ros_robot_controller_msgs
