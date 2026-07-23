@@ -7,131 +7,187 @@
 
     <style>
       :root{
-        --bg:#0b0f16;
-        --panel:#121a26;
-        --panel2:#0f1622;
-        --text:#d7e2f0;
-        --muted:#8ea2bd;
-        --line:#233247;
-
-        --good:#1ed760;
-        --warn:#f5c542;
-        --bad:#ff4d4d;
-
-        --btn:#1b2636;
-        --btn2:#223149;
-        --accent:#49b6ff;
-
-        --radius:16px;
+        --bg:#080b10;
+        --surface:#101721;
+        --surface2:#151f2d;
+        --surface3:#0d131c;
+        --line:#263547;
+        --text:#e5edf7;
+        --muted:#95a7bc;
+        --blue:#44b7ff;
+        --green:#29d47b;
+        --yellow:#f2c94c;
+        --red:#ff4d5e;
+        --shadow:0 18px 50px rgba(0,0,0,.34);
+        --radius:10px;
       }
 
       *{box-sizing:border-box}
       body{
         margin:0;
-        background: radial-gradient(1200px 600px at 20% 0%, #12223a 0%, var(--bg) 55%) fixed;
+        background:var(--bg);
         color:var(--text);
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
         line-height:1.35;
       }
 
       .topbar{
-        position:sticky; top:0; z-index:10;
-        background: rgba(11,15,22,0.85);
-        backdrop-filter: blur(10px);
-        border-bottom:1px solid rgba(35,50,71,0.7);
+        position:sticky;
+        top:0;
+        z-index:20;
+        border-bottom:1px solid var(--line);
+        background:rgba(8,11,16,.94);
+        backdrop-filter:blur(10px);
       }
       .topbar-inner{
-        max-width:1200px;
+        max-width:1440px;
         margin:0 auto;
-        padding:12px 14px;
+        min-height:58px;
+        padding:10px 16px;
         display:flex;
-        align-items:center;
         justify-content:space-between;
+        align-items:center;
         gap:12px;
       }
       .brand{
-        display:flex; align-items:center; gap:10px;
-        font-weight:700;
-        letter-spacing:0.4px;
+        display:flex;
+        align-items:center;
+        gap:10px;
+        min-width:0;
       }
-      .dot{
-        width:10px; height:10px; border-radius:50%;
-        background: var(--warn);
-        box-shadow: 0 0 10px rgba(245,197,66,0.55);
+      .brand-mark{
+        width:28px;
+        height:28px;
+        border:1px solid rgba(68,183,255,.7);
+        border-radius:7px;
+        display:grid;
+        place-items:center;
+        color:var(--blue);
+        font-weight:800;
+        font-size:12px;
+      }
+      .brand-title{
+        font-weight:750;
+        letter-spacing:.2px;
+      }
+      .brand-sub{
+        color:var(--muted);
+        font-size:12px;
+      }
+      .top-status{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex-wrap:wrap;
+        justify-content:flex-end;
       }
       .pill{
-        display:flex; align-items:center; gap:8px;
-        padding:8px 10px;
-        border:1px solid rgba(35,50,71,0.9);
-        background: rgba(18,26,38,0.7);
+        display:flex;
+        align-items:center;
+        gap:7px;
+        border:1px solid var(--line);
+        background:rgba(21,31,45,.72);
+        padding:7px 10px;
         border-radius:999px;
         color:var(--muted);
         font-size:12px;
         white-space:nowrap;
       }
-      .pill b{color:var(--text); font-weight:600}
+      .pill b{color:var(--text); font-weight:700}
+      .dot{
+        width:8px;
+        height:8px;
+        border-radius:50%;
+        background:var(--yellow);
+        box-shadow:0 0 12px rgba(242,201,76,.6);
+      }
 
       .wrap{
-        max-width:1200px;
+        max-width:1440px;
         margin:0 auto;
-        padding:14px;
+        padding:16px;
       }
-
-      .grid{
+      .layout{
         display:grid;
-        grid-template-columns: 1.6fr 1fr;
-        gap:14px;
+        grid-template-columns:minmax(0,1.55fr) minmax(360px,.8fr);
+        gap:16px;
+        align-items:start;
       }
-      @media (max-width: 900px){
-        .grid{ grid-template-columns: 1fr; }
+      @media (max-width:980px){
+        .layout{grid-template-columns:1fr}
+        .topbar-inner{align-items:flex-start; flex-direction:column}
+        .top-status{justify-content:flex-start}
       }
 
       .card{
-        background: rgba(18,26,38,0.75);
-        border:1px solid rgba(35,50,71,0.9);
-        border-radius: var(--radius);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        background:var(--surface);
+        border:1px solid var(--line);
+        border-radius:var(--radius);
+        box-shadow:var(--shadow);
         overflow:hidden;
       }
-
-      .card-h{
-        padding:12px 12px 10px;
-        display:flex; align-items:center; justify-content:space-between;
-        border-bottom:1px solid rgba(35,50,71,0.7);
-        background: rgba(15,22,34,0.55);
+      .card-head{
+        min-height:48px;
+        padding:11px 12px;
+        border-bottom:1px solid var(--line);
+        background:var(--surface3);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
       }
-      .card-h .title{
-        font-size:13px;
+      .title{
         color:var(--muted);
-        letter-spacing:0.3px;
+        font-size:12px;
+        font-weight:750;
         text-transform:uppercase;
+        letter-spacing:.7px;
       }
-
-      /* Panels */
-      .panel{
-        background: rgba(15,22,34,0.55);
-        border:1px solid rgba(35,50,71,0.85);
-        border-radius: 14px;
-        padding:12px;
-      }
-      .panel .title{
-        font-size:13px;
+      .mono{
         color:var(--muted);
-        letter-spacing:0.3px;
-        text-transform:uppercase;
-        margin-bottom:8px;
+        font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size:12px;
       }
 
-      /* Video */
-      .video-shell{ padding:12px; }
+      .feed-tools{
+        display:flex;
+        flex-wrap:wrap;
+        align-items:center;
+        gap:8px;
+      }
+      .segmented{
+        display:inline-flex;
+        border:1px solid var(--line);
+        background:#0a0f16;
+        border-radius:8px;
+        padding:3px;
+        gap:3px;
+      }
+      .seg-btn{
+        appearance:none;
+        border:0;
+        border-radius:6px;
+        color:var(--muted);
+        background:transparent;
+        padding:7px 10px;
+        cursor:pointer;
+        font-weight:750;
+        font-size:12px;
+      }
+      .seg-btn.active{
+        color:#061019;
+        background:var(--blue);
+      }
+
+      .video-shell{padding:12px}
       .video-frame{
         width:100%;
-        aspect-ratio: 16 / 9;
-        border-radius: 14px;
-        border:1px solid rgba(35,50,71,0.85);
-        background: #05070b;
-        overflow:hidden;
+        aspect-ratio:16/9;
         position:relative;
+        overflow:hidden;
+        border:1px solid var(--line);
+        border-radius:8px;
+        background:#020407;
       }
       .video-frame img{
         width:100%;
@@ -141,297 +197,407 @@
       }
       .video-overlay{
         position:absolute;
-        left:10px; bottom:10px;
-        display:flex; gap:8px; flex-wrap:wrap;
-      }
-      .tag{
-        font-size:12px;
-        padding:6px 8px;
-        border-radius:999px;
-        border:1px solid rgba(35,50,71,0.85);
-        background: rgba(10,14,20,0.55);
-        color: var(--muted);
-      }
-      .tag b{ color: var(--text); font-weight:600; }
-
-      /* Controls */
-      .controls{
-        padding:12px;
+        left:10px;
+        right:10px;
+        bottom:10px;
         display:flex;
-        flex-direction:column;
-        gap:12px;
-      }
-
-      .row{
-        display:flex;
-        gap:10px;
+        gap:8px;
         flex-wrap:wrap;
       }
+      .tag{
+        color:var(--muted);
+        background:rgba(4,7,11,.72);
+        border:1px solid rgba(149,167,188,.25);
+        border-radius:7px;
+        padding:6px 8px;
+        font-size:12px;
+      }
+      .tag b{color:var(--text)}
+
+      .panel{
+        border:1px solid var(--line);
+        background:var(--surface2);
+        border-radius:8px;
+        padding:12px;
+      }
+      .stack{display:flex; flex-direction:column; gap:12px}
+      .row{display:flex; gap:8px; flex-wrap:wrap}
+      .kv{
+        display:grid;
+        grid-template-columns:120px 1fr;
+        gap:8px 10px;
+        color:var(--muted);
+        font-size:13px;
+      }
+      .kv .v{color:var(--text); font-weight:700; min-width:0; overflow-wrap:anywhere}
 
       .btn{
         appearance:none;
-        border:none;
-        border-radius: 14px;
-        padding:12px 12px;
-        background: linear-gradient(180deg, var(--btn2), var(--btn));
-        color: var(--text);
-        font-weight:650;
-        letter-spacing:0.2px;
+        border:1px solid var(--line);
+        background:#182232;
+        color:var(--text);
+        border-radius:8px;
+        padding:11px 12px;
+        min-height:42px;
+        font-weight:760;
         cursor:pointer;
-        border:1px solid rgba(35,50,71,0.9);
-        min-width: 120px;
-        flex:1 1 120px;
+        flex:1 1 125px;
       }
-      .btn:hover{ filter: brightness(1.05); }
-      .btn:active{ transform: translateY(1px); }
-      .btn:disabled{ opacity:0.5; cursor:not-allowed; transform:none; }
-
-      .btn-primary{
-        border-color: rgba(73,182,255,0.55);
-        box-shadow: 0 0 0 1px rgba(73,182,255,0.15) inset;
-      }
-      .btn-danger{
-        border-color: rgba(255,77,77,0.55);
-        box-shadow: 0 0 0 1px rgba(255,77,77,0.15) inset;
-      }
-
-      .kv{
-        display:grid;
-        grid-template-columns: 120px 1fr;
-        gap:8px 10px;
-        font-size:13px;
-        color:var(--muted);
-      }
-      .kv .v{ color: var(--text); font-weight:600; }
+      .btn:hover{filter:brightness(1.08)}
+      .btn:active{transform:translateY(1px)}
+      .btn:disabled{opacity:.62; cursor:wait; filter:none}
+      .btn-primary{border-color:rgba(68,183,255,.65); background:#17334a}
+      .btn-good{border-color:rgba(41,212,123,.65); background:#143225}
+      .btn-warn{border-color:rgba(242,201,76,.65); background:#312a13}
+      .btn-danger{border-color:rgba(255,77,94,.7); background:#35151b}
 
       .inputs{
         display:grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap:10px;
+        grid-template-columns:repeat(3, minmax(0,1fr));
+        gap:8px;
       }
-      @media (max-width: 900px){
-        .inputs{ grid-template-columns: 1fr; }
+      @media (max-width:620px){
+        .inputs{grid-template-columns:1fr}
       }
-
       .field label{
         display:block;
+        color:var(--muted);
         font-size:12px;
-        color: var(--muted);
-        margin-bottom:6px;
+        margin-bottom:5px;
       }
       .field input{
         width:100%;
-        padding:12px 12px;
-        border-radius: 12px;
-        border:1px solid rgba(35,50,71,0.9);
-        background: rgba(9,12,18,0.7);
-        color: var(--text);
+        border:1px solid var(--line);
+        background:#090e15;
+        color:var(--text);
+        border-radius:8px;
+        padding:10px 11px;
         outline:none;
-        font-size:14px;
       }
 
-      .hint{ margin-top:8px; font-size:12px; color: var(--muted); }
+      .jog-grid{
+        display:grid;
+        grid-template-columns:1fr 190px 1fr;
+        gap:12px;
+        align-items:center;
+      }
+      .dpad{
+        display:grid;
+        grid-template-columns:58px 58px 58px;
+        grid-template-rows:58px 58px 58px;
+        gap:8px;
+        justify-content:center;
+      }
+      .dpad .btn{min-width:0; padding:8px; flex:auto}
+      @media (max-width:620px){
+        .jog-grid{grid-template-columns:1fr}
+      }
+
+      .program-grid{
+        display:grid;
+        grid-template-columns:1fr;
+        gap:8px;
+      }
+      .program{
+        border:1px solid rgba(149,167,188,.18);
+        background:#0c121b;
+        border-radius:8px;
+        padding:9px 10px;
+      }
+      .program b{display:block; font-size:13px}
+      .program span{display:block; color:var(--muted); font-size:12px; margin-top:2px}
 
       .danger-zone{
-        border-color: rgba(255,77,77,0.4);
-        background: rgba(40,12,12,0.25);
+        border-color:rgba(255,77,94,.5);
+        background:#1d0d12;
       }
-
-      .tiny{ font-size:12px; color:var(--muted); }
+      .hint{
+        color:var(--muted);
+        font-size:12px;
+        margin-top:8px;
+      }
     </style>
   </head>
 
   <body>
-    <div class="topbar">
+    <header class="topbar">
       <div class="topbar-inner">
         <div class="brand">
-          <div class="dot" id="connDot"></div>
-          <div>JetArm Control Panel</div>
+          <div class="brand-mark">JA</div>
+          <div>
+            <div class="brand-title">JetArm Exhibition Console</div>
+            <div class="brand-sub">YOLO sorting, OpenCV comparison, manual control</div>
+          </div>
         </div>
-        <div class="pill">
-          <span>State:</span>
-          <b id="stateText">UNKNOWN</b>
-          <span style="opacity:.55">|</span>
-          <span>FPS:</span>
-          <b id="fpsText">--</b>
-          <span style="opacity:.55">|</span>
-          <span>Scanner:</span>
-          <b id="scannerText">--</b>
+        <div class="top-status">
+          <div class="pill"><span class="dot" id="connDot"></span><span>Link</span><b id="connText">--</b></div>
+          <div class="pill"><span>State</span><b id="stateText">UNKNOWN</b></div>
+          <div class="pill"><span>Scanner</span><b id="scannerText">--</b></div>
+          <div class="pill"><span>Time</span><b id="serverTime">--</b></div>
         </div>
       </div>
-    </div>
+    </header>
 
-    <div class="wrap">
-      <div class="grid">
-        <!-- LEFT: VIDEO -->
-        <div class="card">
-          <div class="card-h">
-            <div class="title">Live Camera</div>
-            <div class="tiny" id="videoMeta">/video</div>
+    <main class="wrap">
+      <div class="layout">
+        <section class="card">
+          <div class="card-head">
+            <div>
+              <div class="title">Vision Feed</div>
+              <div class="mono" id="videoMeta">/video/raw</div>
+            </div>
+            <div class="feed-tools">
+              <div class="segmented" aria-label="Video mode">
+                <button class="seg-btn active" id="feedRaw" data-src="/video/raw" data-label="RAW">Raw</button>
+                <button class="seg-btn" id="feedOpenCV" data-src="/video/opencv" data-label="OPENCV">OpenCV</button>
+                <button class="seg-btn" id="feedYolo" data-src="/video/yolo" data-label="YOLO">YOLO</button>
+              </div>
+            </div>
           </div>
-
           <div class="video-shell">
             <div class="video-frame">
-              <img id="videoEl" src="/video" alt="Live stream" />
+              <img id="videoEl" src="/video/raw" alt="JetArm live stream" />
               <div class="video-overlay">
-                <div class="tag">Last action: <b id="lastActionText">--</b></div>
-                <div class="tag">Last detection: <b id="lastDetText">--</b></div>
+                <div class="tag">Mode: <b id="feedModeText">RAW</b></div>
+                <div class="tag">Action: <b id="lastActionText">--</b></div>
+                <div class="tag">Detection: <b id="lastDetText">--</b></div>
               </div>
             </div>
-            <div class="hint">Tip: if stream freezes, refresh once. Persistent freezes usually means the overlay crashed or camera is busy.</div>
+            <div class="hint">Raw is camera-only, OpenCV is the legacy contour overlay, YOLO is the trained LEGO detector overlay.</div>
           </div>
-        </div>
+        </section>
 
-        <!-- RIGHT: STATUS + CONTROLS -->
-        <div class="card">
-          <div class="card-h">
-            <div class="title">Controls</div>
-            <div class="tiny" id="serverTime">--</div>
+        <aside class="card">
+          <div class="card-head">
+            <div class="title">Operator Controls</div>
+            <div class="mono">live</div>
           </div>
-
-          <div class="controls">
-            <!-- Status panel -->
+          <div class="stack" style="padding:12px">
             <div class="panel">
+              <div class="title">Status</div>
               <div class="kv">
-                <div class="k">Connection</div><div class="v" id="connText">--</div>
-                <div class="k">Sort count</div><div class="v" id="countText">--</div>
-                <div class="k">Scanner</div><div class="v" id="scannerText2">--</div>
-                <div class="k">Jog target</div><div class="v" id="jogText">--</div>
-                <div class="k">Last error</div><div class="v" id="errText">--</div>
+                <div>Sort count</div><div class="v" id="countText">--</div>
+                <div>Scanner</div><div class="v" id="scannerText2">--</div>
+                <div>Actuation</div><div class="v" id="actuationText">--</div>
+                <div>Person follow</div><div class="v" id="personFollowText">--</div>
+                <div>Jog target</div><div class="v" id="jogText">--</div>
+                <div>Last error</div><div class="v" id="errText">--</div>
               </div>
             </div>
 
-            <!-- Main buttons -->
             <div class="panel">
+              <div class="title">Scanner</div>
               <div class="row">
-                <button class="btn btn-primary" id="btnPause">Pause</button>
+                <button class="btn btn-good" id="btnScannerStart">Start Scanner Cycle</button>
+                <button class="btn btn-danger" id="btnScannerStop">Stop Scanner</button>
+              </div>
+              <div class="hint">Preview mode performs one YOLO scan without robot motion. Actuation mode sorts, presses the button, and restarts until stopped.</div>
+            </div>
+
+            <div class="panel">
+              <div class="title">Motion State</div>
+              <div class="row">
+                <button class="btn btn-warn" id="btnPause">Pause</button>
                 <button class="btn btn-primary" id="btnResume">Resume</button>
               </div>
-              <div class="row">
+              <div class="row" style="margin-top:8px">
                 <button class="btn btn-danger" id="btnStop">Stop</button>
                 <button class="btn btn-danger" id="btnEstop">E-Stop</button>
               </div>
-              <div class="row">
-                <button class="btn btn-primary" id="btnScannerStart">Start Vision Scanner</button>
-                <button class="btn btn-danger" id="btnScannerStop">Stop Vision Scanner</button>
+              <div class="row" style="margin-top:8px">
+                <button class="btn btn-warn" id="btnClearEstop">Clear E-Stop Latch</button>
               </div>
-              <div class="hint">Stop/E-Stop is safety-critical. Backend must enforce motor safety.</div>
+              <div class="hint">Clearing the E-stop leaves motion paused. Resume is a separate action.</div>
             </div>
 
-            <!-- Manual GoTo -->
+            <div class="panel">
+              <div class="title">User-Friendly Mode</div>
+              <div class="row">
+                <button class="btn btn-good" id="btnPersonFollowStart">Start Person Follow</button>
+                <button class="btn btn-danger" id="btnPersonFollowStop">Stop Follow</button>
+              </div>
+              <div class="row" style="margin-top:8px">
+                <button class="btn btn-primary" id="btnIdlePose">Idle Pose</button>
+                <button class="btn btn-primary" id="btnLookAround">Look Around</button>
+              </div>
+              <div class="row" style="margin-top:8px">
+                <button class="btn btn-primary" id="btnHelloWave">Hello Wave</button>
+                <button class="btn btn-primary" id="btnCuriousIdle">Curious Idle</button>
+              </div>
+              <div class="row" style="margin-top:8px">
+                <button class="btn btn-warn" id="btnPressButton">Press Button</button>
+              </div>
+              <div class="hint">Person follow uses the camera and only shifts the arm left/right at scan height. The backend blocks it while the scanner is running.</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="layout" style="margin-top:16px">
+        <section class="card">
+          <div class="card-head">
+            <div class="title">Manual Positioning</div>
+            <div class="mono">cm</div>
+          </div>
+          <div class="stack" style="padding:12px">
             <div class="panel">
               <div class="title">Go To</div>
-
               <div class="inputs">
                 <div class="field">
                   <label for="xIn">X</label>
-                  <input id="xIn" inputmode="decimal" placeholder="e.g. 10.5" />
+                  <input id="xIn" inputmode="decimal" placeholder="10.5" />
                 </div>
                 <div class="field">
                   <label for="yIn">Y</label>
-                  <input id="yIn" inputmode="decimal" placeholder="e.g. 22.0" />
+                  <input id="yIn" inputmode="decimal" placeholder="22.0" />
                 </div>
                 <div class="field">
                   <label for="zIn">Z</label>
-                  <input id="zIn" inputmode="decimal" placeholder="e.g. 8.0" />
+                  <input id="zIn" inputmode="decimal" placeholder="8.0" />
                 </div>
               </div>
-
               <div class="row" style="margin-top:10px">
-                <button class="btn btn-primary" id="btnGoto">Go To (X,Y,Z)</button>
-                <button class="btn" id="btnHome">Home</button>
-              </div>
-
-              <div class="row" style="margin-top:10px">
+                <button class="btn btn-primary" id="btnGoto">Go To X/Y/Z</button>
+                <button class="btn" id="btnHome">Scan Pose</button>
                 <button class="btn" id="btnGripOpen">Open Gripper</button>
                 <button class="btn" id="btnGripClose">Close Gripper</button>
               </div>
-
-              <div class="hint">Validation should be server-side (limits, collisions, speed caps).</div>
             </div>
 
-            <!-- Jog Controls (D-pad) -->
             <div class="panel">
               <div class="title">Jog Controls</div>
-
-              <div style="display:grid; grid-template-columns: 1fr 180px 1fr; gap:12px; align-items:center;">
-                <!-- Z column -->
-                <div style="display:flex; flex-direction:column; gap:10px;">
+              <div class="jog-grid">
+                <div class="stack">
                   <button class="btn btn-primary" id="btnZUp">Z Up</button>
                   <button class="btn btn-primary" id="btnZDown">Z Down</button>
                 </div>
-
-                <!-- D-pad -->
-                <div style="display:grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px 60px; gap:8px; justify-content:center;">
+                <div class="dpad">
                   <div></div>
-                  <button class="btn btn-primary" id="btnFwd" style="min-width:0; padding:10px;">↑</button>
+                  <button class="btn btn-primary" id="btnFwd">Y+</button>
                   <div></div>
-
-                  <button class="btn btn-primary" id="btnLeft" style="min-width:0; padding:10px;">←</button>
-                  <button class="btn btn-danger" id="btnCenter" style="min-width:0; padding:10px;">●</button>
-                  <button class="btn btn-primary" id="btnRight" style="min-width:0; padding:10px;">→</button>
-
+                  <button class="btn btn-primary" id="btnLeft">X-</button>
+                  <button class="btn btn-danger" id="btnCenter">Reset</button>
+                  <button class="btn btn-primary" id="btnRight">X+</button>
                   <div></div>
-                  <button class="btn btn-primary" id="btnBack" style="min-width:0; padding:10px;">↓</button>
+                  <button class="btn btn-primary" id="btnBack">Y-</button>
                   <div></div>
                 </div>
-
-                <!-- Step size -->
-                <div>
-                  <div class="field">
-                    <label for="stepIn">Step (cm)</label>
-                    <input id="stepIn" inputmode="decimal" value="0.5" />
-                  </div>
-                  <div class="hint">Tap to jog. ● resets to the default jog pose.</div>
+                <div class="field">
+                  <label for="stepIn">Step size</label>
+                  <input id="stepIn" inputmode="decimal" value="0.5" />
+                  <div class="hint">Jog commands use the server speed setting.</div>
                 </div>
-              </div>
-            </div>
-
-            <!-- Danger zone -->
-            <div class="panel danger-zone">
-              <div class="tiny">
-                Danger zone: E-Stop should cut motion immediately and latch until cleared.
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
+        <aside class="card">
+          <div class="card-head">
+            <div class="title">Active Programs</div>
+            <div class="mono">src</div>
+          </div>
+          <div class="stack" style="padding:12px">
+            <div class="program-grid">
+              <div class="program">
+                <b>YOLO Scanner</b>
+                <span>jetarm.sorting.yolo_vision_scanner</span>
+              </div>
+              <div class="program">
+                <b>YOLO Overlay</b>
+                <span>jetarm.ui.yolo_overlay</span>
+              </div>
+              <div class="program">
+                <b>Legacy OpenCV Overlay</b>
+                <span>jetarm.ui.viewer_overlay</span>
+              </div>
+              <div class="program">
+                <b>Camera Worker</b>
+                <span>jetarm.ui.camera_worker</span>
+              </div>
+            </div>
+            <div class="panel danger-zone">
+              <div class="title">Safety</div>
+              <div class="hint" style="margin-top:0">E-Stop and Stop are software controls. Keep the physical stop path ready during exhibition runs.</div>
+            </div>
+          </div>
+        </aside>
       </div>
-    </div>
+    </main>
 
     <script>
-      // ---------- helpers ----------
       const $ = (id) => document.getElementById(id);
-      let joySpeed = 0.3; // will be overwritten by /api/status if provided
+      let joySpeed = 0.3;
 
       function setConn(ok){
-        $("connDot").style.background = ok ? "var(--good)" : "var(--bad)";
+        $("connDot").style.background = ok ? "var(--green)" : "var(--red)";
         $("connDot").style.boxShadow = ok
-          ? "0 0 10px rgba(30,215,96,0.55)"
-          : "0 0 10px rgba(255,77,77,0.55)";
+          ? "0 0 12px rgba(41,212,123,.65)"
+          : "0 0 12px rgba(255,77,94,.65)";
         $("connText").textContent = ok ? "ONLINE" : "OFFLINE";
       }
 
-      async function postCmd(type, payload){
-        const body = { type, ...payload };
-        const res = await fetch("/api/cmd", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || ("HTTP " + res.status));
+      function switchFeed(button){
+        for (const id of ["feedRaw", "feedOpenCV", "feedYolo"]){
+          $(id).classList.remove("active");
         }
+        button.classList.add("active");
+        const src = button.dataset.src;
+        const label = button.dataset.label;
+        $("videoEl").src = `${src}?t=${Date.now()}`;
+        $("videoMeta").textContent = src;
+        $("feedModeText").textContent = label;
+      }
+
+      for (const id of ["feedRaw", "feedOpenCV", "feedYolo"]){
+        $(id).onclick = () => switchFeed($(id));
+      }
+
+      async function postCmd(type, payload){
+        const res = await fetch("/api/cmd", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({type, ...payload}),
+        });
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
         return await res.json();
       }
 
       async function postScanner(path){
-        const res = await fetch(path, { method: "POST" });
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || ("HTTP " + res.status));
-        }
+        const res = await fetch(path, {method:"POST"});
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
         return await res.json();
+      }
+
+      async function postPersonFollow(path){
+        const res = await fetch(path, {method:"POST"});
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+        return await res.json();
+      }
+
+      async function fireImmediateCmd(button, type, sentText){
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = sentText;
+
+        try {
+          await postCmd(type, {});
+        } catch(e) {
+          alert(`${originalText} failed: ${e.message}`);
+        } finally {
+          setTimeout(() => {
+            button.disabled = false;
+            button.textContent = originalText;
+          }, 1200);
+        }
+      }
+
+      async function runFriendlyMode(type, label){
+        try {
+          await postCmd(type, {});
+        } catch(e) {
+          alert(`${label} failed: ${e.message}`);
+        }
       }
 
       function numOrNull(v){
@@ -444,117 +610,111 @@
         return Number.isFinite(n) ? n : 0.5;
       }
 
-      // Server joystick endpoint uses: joy_target += dx * JOY_SPEED
-      // We want stepIn in cm, so convert cm -> ticks by dividing by JOY_SPEED.
       function cmToTicks(cm){
         const s = Number(joySpeed);
         if (!Number.isFinite(s) || s <= 0) return cm;
         return cm / s;
       }
 
-      async function postJoystick(dx_cm, dy_cm, dz_cm){
-        const body = {
-          dx: cmToTicks(dx_cm),
-          dy: cmToTicks(dy_cm),
-          dz: cmToTicks(dz_cm),
-        };
+      async function postJoystick(dxCm, dyCm, dzCm){
         const res = await fetch("/api/joystick", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify(body),
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({dx:cmToTicks(dxCm), dy:cmToTicks(dyCm), dz:cmToTicks(dzCm)}),
         });
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || ("HTTP " + res.status));
-        }
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
         return await res.json();
       }
 
       async function postJoystickReset(){
-        const res = await fetch("/api/joystick/reset", { method: "POST" });
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || ("HTTP " + res.status));
-        }
+        const res = await fetch("/api/joystick/reset", {method:"POST"});
+        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
         return await res.json();
       }
 
-      // ---------- button wiring ----------
-      $("btnPause").onclick  = async () => { try { await postCmd("pause", {}); } catch(e){ alert("Pause failed: " + e.message); } };
-      $("btnResume").onclick = async () => { try { await postCmd("resume", {}); } catch(e){ alert("Resume failed: " + e.message); } };
-
-      $("btnStop").onclick   = async () => {
-        if (!confirm("STOP the system?")) return;
-        try { await postCmd("stop", {}); } catch(e){ alert("Stop failed: " + e.message); }
+      $("btnPause").onclick = async () => { try { await postCmd("pause", {}); } catch(e){ alert(`Pause failed: ${e.message}`); } };
+      $("btnResume").onclick = async () => { try { await postCmd("resume", {}); } catch(e){ alert(`Resume failed: ${e.message}`); } };
+      $("btnStop").onclick = async () => {
+        await fireImmediateCmd($("btnStop"), "stop", "Stop Sent");
       };
-
-      $("btnEstop").onclick  = async () => {
-        if (!confirm("E-STOP NOW?")) return;
-        try { await postCmd("estop", {}); } catch(e){ alert("E-Stop failed: " + e.message); }
+      $("btnEstop").onclick = async () => {
+        await fireImmediateCmd($("btnEstop"), "estop", "E-Stop Sent");
+      };
+      $("btnClearEstop").onclick = async () => {
+        if (!confirm("Clear the software E-stop latch? Motion will remain paused until Resume is pressed.")) return;
+        await fireImmediateCmd($("btnClearEstop"), "clear_estop", "Latch Cleared");
       };
 
       $("btnScannerStart").onclick = async () => {
         try { await postScanner("/api/scanner/start"); }
-        catch(e){ alert("Start Vision Scanner failed: " + e.message); }
+        catch(e){ alert(`Start scanner failed: ${e.message}`); }
       };
-
       $("btnScannerStop").onclick = async () => {
-        if (!confirm("Stop Vision Scanner?")) return;
+        if (!confirm("Stop active scanner?")) return;
         try { await postScanner("/api/scanner/stop"); }
-        catch(e){ alert("Stop Vision Scanner failed: " + e.message); }
+        catch(e){ alert(`Stop scanner failed: ${e.message}`); }
       };
 
       $("btnGoto").onclick = async () => {
         const x = numOrNull($("xIn").value);
         const y = numOrNull($("yIn").value);
         const z = numOrNull($("zIn").value);
-        if (x === null || y === null || z === null) { alert("Enter valid X, Y, Z numbers."); return; }
-        try { await postCmd("goto", { x, y, z }); } catch(e){ alert("GoTo failed: " + e.message); }
+        if (x === null || y === null || z === null) {
+          alert("Enter valid X, Y, and Z numbers.");
+          return;
+        }
+        try { await postCmd("goto", {x, y, z}); } catch(e){ alert(`Go To failed: ${e.message}`); }
       };
+      $("btnHome").onclick = async () => { try { await postCmd("home", {}); } catch(e){ alert(`Scan pose failed: ${e.message}`); } };
+      $("btnGripOpen").onclick = async () => { try { await postCmd("open_gripper", {}); } catch(e){ alert(`Open gripper failed: ${e.message}`); } };
+      $("btnGripClose").onclick = async () => { try { await postCmd("close_gripper", {}); } catch(e){ alert(`Close gripper failed: ${e.message}`); } };
+      $("btnPersonFollowStart").onclick = async () => {
+        try { await postPersonFollow("/api/person_follow/start"); }
+        catch(e){ alert(`Start person follow failed: ${e.message}`); }
+      };
+      $("btnPersonFollowStop").onclick = async () => {
+        try { await postPersonFollow("/api/person_follow/stop"); }
+        catch(e){ alert(`Stop person follow failed: ${e.message}`); }
+      };
+      $("btnIdlePose").onclick = async () => runFriendlyMode("idle_pose", "Idle pose");
+      $("btnLookAround").onclick = async () => runFriendlyMode("look_around", "Look around");
+      $("btnHelloWave").onclick = async () => runFriendlyMode("hello_wave", "Hello wave");
+      $("btnCuriousIdle").onclick = async () => runFriendlyMode("curious_idle", "Curious idle");
+      $("btnPressButton").onclick = async () => runFriendlyMode("press_button", "Press button");
 
-      $("btnHome").onclick = async () => { try { await postCmd("home", {}); } catch(e){ alert("Home failed: " + e.message); } };
-
-      $("btnGripOpen").onclick  = async () => { try { await postCmd("open_gripper", {}); } catch(e){ alert("Open gripper failed: " + e.message); } };
-      $("btnGripClose").onclick = async () => { try { await postCmd("close_gripper", {}); } catch(e){ alert("Close gripper failed: " + e.message); } };
-
-      // Jog (D-pad): ↑ = +Y, ↓ = -Y, → = +X, ← = -X, Z Up/Down = ±Z
-      $("btnLeft").onclick  = async () => { try { await postJoystick(-stepValCm(), 0, 0); } catch(e){ alert("Jog failed: " + e.message); } };
-      $("btnRight").onclick = async () => { try { await postJoystick( stepValCm(), 0, 0); } catch(e){ alert("Jog failed: " + e.message); } };
-      $("btnFwd").onclick   = async () => { try { await postJoystick(0, stepValCm(), 0); } catch(e){ alert("Jog failed: " + e.message); } };
-      $("btnBack").onclick  = async () => { try { await postJoystick(0,-stepValCm(), 0); } catch(e){ alert("Jog failed: " + e.message); } };
-      $("btnZUp").onclick   = async () => { try { await postJoystick(0, 0, stepValCm()); } catch(e){ alert("Jog failed: " + e.message); } };
-      $("btnZDown").onclick = async () => { try { await postJoystick(0, 0,-stepValCm()); } catch(e){ alert("Jog failed: " + e.message); } };
-
+      $("btnLeft").onclick = async () => { try { await postJoystick(-stepValCm(), 0, 0); } catch(e){ alert(`Jog failed: ${e.message}`); } };
+      $("btnRight").onclick = async () => { try { await postJoystick(stepValCm(), 0, 0); } catch(e){ alert(`Jog failed: ${e.message}`); } };
+      $("btnFwd").onclick = async () => { try { await postJoystick(0, stepValCm(), 0); } catch(e){ alert(`Jog failed: ${e.message}`); } };
+      $("btnBack").onclick = async () => { try { await postJoystick(0, -stepValCm(), 0); } catch(e){ alert(`Jog failed: ${e.message}`); } };
+      $("btnZUp").onclick = async () => { try { await postJoystick(0, 0, stepValCm()); } catch(e){ alert(`Jog failed: ${e.message}`); } };
+      $("btnZDown").onclick = async () => { try { await postJoystick(0, 0, -stepValCm()); } catch(e){ alert(`Jog failed: ${e.message}`); } };
       $("btnCenter").onclick = async () => {
-        if (!confirm("Reset jog target to default pose?")) return;
-        try { await postJoystickReset(); } catch(e){ alert("Reset failed: " + e.message); }
+        if (!confirm("Reset jog target?")) return;
+        try { await postJoystickReset(); } catch(e){ alert(`Reset failed: ${e.message}`); }
       };
 
-      // ---------- status polling ----------
       function setScannerText(running){
-        const t = running ? "RUNNING" : "OFF";
-        $("scannerText").textContent = t;
-        $("scannerText2").textContent = t;
+        const text = running ? "RUNNING" : "OFF";
+        $("scannerText").textContent = text;
+        $("scannerText2").textContent = text;
       }
 
       async function refreshStatus(){
         try{
-          const res = await fetch("/api/status", { cache: "no-store" });
-          if(!res.ok) throw new Error("HTTP " + res.status);
+          const res = await fetch("/api/status", {cache:"no-store"});
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const s = await res.json();
 
           setConn(true);
-
           $("stateText").textContent = s.state ?? "UNKNOWN";
-          $("fpsText").textContent = (s.fps ?? "--");
           $("lastActionText").textContent = s.last_action ?? "--";
           $("lastDetText").textContent = s.last_detection ?? "--";
-          $("countText").textContent = (s.sort_count ?? "--");
+          $("countText").textContent = s.sort_count ?? "--";
           $("errText").textContent = s.last_error ?? "--";
           $("serverTime").textContent = s.server_time ?? "--";
-
-          const running = !!s.scanner_running;
-          setScannerText(running);
+          setScannerText(!!s.scanner_running);
+          $("actuationText").textContent = s.scanner_actuation_enabled ? "ENABLED" : "PREVIEW ONLY";
+          $("personFollowText").textContent = s.person_follow_running ? "RUNNING" : "OFF";
 
           if (Number.isFinite(Number(s.joy_speed))) joySpeed = Number(s.joy_speed);
 
@@ -566,14 +726,13 @@
               $("jogText").textContent = `${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`;
             }
           }
-
         }catch(e){
           setConn(false);
         }
       }
 
       refreshStatus();
-      setInterval(refreshStatus, 350);
+      setInterval(refreshStatus, 500);
     </script>
   </body>
 </html>

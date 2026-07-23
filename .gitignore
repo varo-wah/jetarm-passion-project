@@ -231,6 +231,9 @@ outputs/
 !data/processed/jetarm-lego-detector/
 !data/processed/jetarm-lego-detector/**
 
+# Reapply metadata exclusion after the intentional dataset exceptions above.
+**/.DS_Store
+
 # Large model artifacts are usually managed outside Git unless intentionally tracked.
 models/trained/
 models/exported/

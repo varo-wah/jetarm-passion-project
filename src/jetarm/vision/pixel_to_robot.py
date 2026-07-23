@@ -224,6 +224,12 @@ def detect_bricks(frame: np.ndarray) -> List[Dict[str, float]]:  # L178
             "y": float(Yr),  # L233
             "angle": float(angle),  # L234
             "color": color,  # L235
+            "center_x": int(round(cx)),
+            "center_y": int(round(cy)),
+            "x1": int(x),
+            "y1": int(y),
+            "x2": int(x + bw),
+            "y2": int(y + bh),
         })  # L236
 
     return bricks  # L238

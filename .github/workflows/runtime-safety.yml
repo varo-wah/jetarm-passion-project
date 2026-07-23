@@ -1,0 +1,33 @@
+name: Runtime safety
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feature/yolo-coordinate-reliability
+
+jobs:
+  safety-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install project
+        run: python -m pip install .
+
+      - name: Parse Python sources
+        run: python -m compileall -q src tests scripts
+
+      - name: Run safety and runtime tests
+        env:
+          PYTHONPATH: src
+          JETARM_ENABLE_ACTUATION: "0"
+        run: python -m unittest discover -s tests -v

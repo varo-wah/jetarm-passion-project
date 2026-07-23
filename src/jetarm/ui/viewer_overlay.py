@@ -1,18 +1,7 @@
 import cv2
 import numpy as np
+
 from jetarm.vision.coordinatelogic import detect_color, pixel_to_robot
-
-# =========================
-# ROI (TUNE THESE)
-# Bigger ROI: decrease X0/Y0, increase X1/Y1
-# =========================
-ROI_X0_FRAC = 0.12
-ROI_X1_FRAC = 0.88
-ROI_Y0_FRAC = 0.03
-ROI_Y1_FRAC = 0.75
-
-ROI_DRAW_BOX = True
-ROI_MASK_DISPLAY = False   # visual only (does not affect detection)
 
 MIN_AREA = 400
 MAX_AREA = 20000
@@ -20,20 +9,6 @@ MAX_AREA = 20000
 # Clean-up to stabilize contours under changing lighting
 MORPH_ON = True
 MORPH_KERNEL = (3, 3)
-
-
-def _roi_bounds(frame):
-    h, w = frame.shape[:2]
-    x0 = int(w * ROI_X0_FRAC)
-    x1 = int(w * ROI_X1_FRAC)
-    y0 = int(h * ROI_Y0_FRAC)
-    y1 = int(h * ROI_Y1_FRAC)
-
-    x0 = max(0, min(x0, w - 2))
-    x1 = max(x0 + 1, min(x1, w - 1))
-    y0 = max(0, min(y0, h - 2))
-    y1 = max(y0 + 1, min(y1, h - 1))
-    return x0, y0, x1, y1
 
 
 def annotate_frame(frame):
@@ -44,16 +19,8 @@ def annotate_frame(frame):
     src = frame
     out = frame.copy()
 
-    x0, y0, x1, y1 = _roi_bounds(src)
-
-    # Optional: visually hide outside ROI on the stream
-    if ROI_MASK_DISPLAY:
-        masked = np.zeros_like(out)
-        masked[y0:y1, x0:x1] = out[y0:y1, x0:x1]
-        out = masked
-
-    # --- DETECT ONLY INSIDE ROI (crop for detection stability) ---
-    work = src[y0:y1, x0:x1]
+    # OpenCV feed intentionally scans the full frame for exhibition comparison.
+    work = src
     if work.size == 0:
         return out
 
@@ -86,21 +53,17 @@ def annotate_frame(frame):
             angle += 90
         angle = angle % 180
 
-        # ROI-local -> full-frame pixels
-        cx_full = float(cx + x0)
-        cy_full = float(cy + y0)
+        cx_full = float(cx)
+        cy_full = float(cy)
 
-        # Draw rotated box (offset ROI)
         box = cv2.boxPoints(rect)
         box = np.int32(box)
-        box[:, 0] += x0
-        box[:, 1] += y0
         cv2.drawContours(out, [box], 0, (0, 255, 0), 2)
 
-        # Bounding box for text + color ROI (offset ROI)
+        # Bounding box for text + color sampling.
         bx, by, bw, bh = cv2.boundingRect(c)
-        bx_full = bx + x0
-        by_full = by + y0
+        bx_full = bx
+        by_full = by
 
         pad = int(min(bw, bh) * 0.08)
         pad = max(2, min(pad, 6))
@@ -126,11 +89,5 @@ def annotate_frame(frame):
         cv2.putText(out, f"{color}",
                     (bx_full, by_full + 35),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-
-    # Draw ROI box LAST (so it never affects thresholding)
-    if ROI_DRAW_BOX:
-        cv2.rectangle(out, (x0, y0), (x1, y1), (0, 255, 255), 2)
-        cv2.putText(out, "DETECTION ROI", (x0, max(20, y0 - 10)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
     return out

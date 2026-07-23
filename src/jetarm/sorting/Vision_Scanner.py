@@ -10,7 +10,20 @@ import numpy as np
 import requests
 
 from jetarm.hardware.Class_Execution import ik, gripper, camera
-from jetarm.vision.coordinatelogic import detect_bricks
+from jetarm.vision.yolo_detector import detect_bricks_yolo as detect_bricks
+from jetarm.vision.wrist_safety import choose_safe_wrist_angle
+
+ACTUATION_ENV = "JETARM_ENABLE_ACTUATION"
+
+
+def env_flag(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+ENABLE_ACTUATION = env_flag(ACTUATION_ENV, default=False)
 
 UI_SERVER = os.environ.get("UI_SERVER", "http://127.0.0.1:8000")
 FRAME_URL = f"{UI_SERVER}/api/frame.jpg"
@@ -28,6 +41,17 @@ PICK_Z = 3.0
 DROP_Z = 10.0
 
 MAX_PICKS = 50
+
+# Cluster separation assist. When enabled, the scanner separates tight brick
+# clusters before attempting a full pick/drop.
+ENABLE_CLUSTER_SEPARATION = True
+CLUSTER_DISTANCE_CM = 4.0
+MAX_CLUSTER_SEPARATIONS = 8
+SEPARATION_PUSH_CM = 3.0
+SEPARATION_NUDGE_Z = PICK_Z + 1.5
+SEPARATION_GRIP_SETTLE = 0.35
+SEPARATION_X_LIMITS = (-20.0, 20.0)
+SEPARATION_Y_LIMITS = (5.0, 28.0)
 
 # Timing (important: prevents command spam / "glitching")
 # Tune MOVE_TIME to match your servo motion duration (often ~1.0s).
@@ -136,6 +160,8 @@ def scan_once():
 
     frame = take_snapshot()
     bricks = detect_bricks(frame)
+    for brick in bricks:
+        brick["frame_shape"] = frame.shape
 
     print_bricks(bricks)
     return bricks
@@ -146,24 +172,135 @@ def choose_brick(bricks):
     return min(bricks, key=lambda b: (b["x"] ** 2 + b["y"] ** 2))
 
 
+def closest_neighbor(brick, bricks):
+    neighbors = []
+    for other in bricks:
+        if other is brick:
+            continue
+
+        dx = float(brick["x"]) - float(other["x"])
+        dy = float(brick["y"]) - float(other["y"])
+        distance = float(np.hypot(dx, dy))
+        neighbors.append((distance, other))
+
+    if not neighbors:
+        return None, None
+
+    return min(neighbors, key=lambda item: item[0])
+
+
+def clamped_separation_point(brick, neighbor):
+    dx = float(brick["x"]) - float(neighbor["x"])
+    dy = float(brick["y"]) - float(neighbor["y"])
+    length = float(np.hypot(dx, dy))
+
+    if length < 0.01:
+        dx = float(brick["x"])
+        dy = float(brick["y"])
+        length = float(np.hypot(dx, dy))
+
+    if length < 0.01:
+        dx, dy, length = 1.0, 0.0, 1.0
+
+    ux = dx / length
+    uy = dy / length
+
+    push_x = float(brick["x"]) + ux * SEPARATION_PUSH_CM
+    push_y = float(brick["y"]) + uy * SEPARATION_PUSH_CM
+
+    push_x = max(SEPARATION_X_LIMITS[0], min(SEPARATION_X_LIMITS[1], push_x))
+    push_y = max(SEPARATION_Y_LIMITS[0], min(SEPARATION_Y_LIMITS[1], push_y))
+
+    return push_x, push_y
+
+
+def separate_close_cluster(brick, neighbor, distance):
+    x = float(brick["x"])
+    y = float(brick["y"])
+    detected_angle = float(brick.get("angle", 90.0))
+    angle, edge_status = choose_safe_wrist_angle(brick, brick.get("frame_shape"))
+    push_x, push_y = clamped_separation_point(brick, neighbor)
+
+    if float(np.hypot(push_x - x, push_y - y)) < 0.5:
+        print("[SEPARATION] Push vector too small after workspace clamp; skipping assist")
+        return False
+
+    stage(
+        "[SEPARATION] CLOSE BRICKS DETECTED",
+        (
+            f"• target=({x:.2f}, {y:.2f}) "
+            f"neighbor=({neighbor['x']:.2f}, {neighbor['y']:.2f}) "
+            f"distance={distance:.2f}cm push_to=({push_x:.2f}, {push_y:.2f})"
+        ),
+    )
+
+    if not move_wait(x, y, APPROACH_Z, "[SEPARATION] APPROACH TARGET"):
+        return False
+
+    print(
+        "[SEPARATION] ALIGN WRIST  • "
+        f"detected={detected_angle:.1f}° final={angle:.1f}° edge={edge_status}"
+    )
+    gripper.turn_wrist(angle)
+    time.sleep(WRIST_SETTLE)
+
+    print("[SEPARATION] CLOSE GRIPPER AS PUSH FINGER")
+    gripper.close_gripper()
+    time.sleep(SEPARATION_GRIP_SETTLE)
+
+    if not move_wait(x, y, SEPARATION_NUDGE_Z, "[SEPARATION] LOWER TO NUDGE HEIGHT"):
+        gripper.open_gripper()
+        time.sleep(RELEASE_SETTLE)
+        return False
+
+    if not move_wait(push_x, push_y, SEPARATION_NUDGE_Z, "[SEPARATION] PUSH AWAY FROM NEIGHBOR"):
+        gripper.open_gripper()
+        time.sleep(RELEASE_SETTLE)
+        return False
+
+    if not move_wait(push_x, push_y, APPROACH_Z, "[SEPARATION] LIFT AFTER PUSH"):
+        gripper.open_gripper()
+        time.sleep(RELEASE_SETTLE)
+        return False
+
+    print("[SEPARATION] OPEN GRIPPER AND RESCAN")
+    gripper.open_gripper()
+    time.sleep(RELEASE_SETTLE)
+    camera.scan_position()
+    time.sleep(SCAN_SETTLE)
+    return True
+
+
+def should_separate_before_pick(brick, bricks):
+    if not ENABLE_CLUSTER_SEPARATION:
+        return False, None, None
+
+    distance, neighbor = closest_neighbor(brick, bricks)
+    if neighbor is None or distance is None:
+        return False, None, None
+
+    return distance <= CLUSTER_DISTANCE_CM, neighbor, distance
+
+
 # =========================
 # PICK + DROP (ONE BRICK)
 # =========================
 def pick_and_drop(brick):
     x = brick["x"]
     y = brick["y"]
-    angle = brick["angle"]
+    detected_angle = brick["angle"]
+    angle, edge_status = choose_safe_wrist_angle(brick, brick.get("frame_shape"))
     bx, by = bucket_for_color(brick.get("color"))
 
     stage("🎯 SELECTED BRICK",
-          f"• x={x:.2f}, y={y:.2f}, angle={angle:.1f}, color={brick['color']}")
+          f"• x={x:.2f}, y={y:.2f}, angle={detected_angle:.1f}, color={brick['color']}")
 
     # 1) Approach above brick
     if not move_wait(x, y, APPROACH_Z, "🚀 APPROACHING"):
         return False
 
     # 2) Wrist align
-    print(f"🧭 ALIGN WRIST  • target angle={angle:.1f}°")
+    print(f"🧭 ALIGN WRIST  • detected={detected_angle:.1f}° final={angle:.1f}° edge={edge_status}")
     gripper.turn_wrist(angle)
     time.sleep(WRIST_SETTLE)
 
@@ -209,7 +346,15 @@ def pick_and_drop(brick):
 # MAIN LOOP (RESCAN EACH PICK)
 # =========================
 def main():
+    if not ENABLE_ACTUATION:
+        stage(
+            "SCANNER ACTUATION BLOCKED",
+            f"Set {ACTUATION_ENV}=1 before launch to explicitly enable robot motion.",
+        )
+        return
+
     picked = 0
+    separation_attempts = 0
 
     while picked < MAX_PICKS:
         bricks = scan_once()
@@ -220,9 +365,25 @@ def main():
 
         brick = choose_brick(bricks)
 
+        should_separate, neighbor, distance = should_separate_before_pick(brick, bricks)
+        if should_separate:
+            if separation_attempts >= MAX_CLUSTER_SEPARATIONS:
+                stage(
+                    "[SEPARATION] LIMIT REACHED",
+                    "• Continuing with normal pick/drop to avoid endless separation loops",
+                )
+            else:
+                ok = separate_close_cluster(brick, neighbor, distance)
+                if ok:
+                    separation_attempts += 1
+                    print(f"[SEPARATION] Completed assist count: {separation_attempts}")
+                    continue
+                print("[SEPARATION] Assist failed or skipped; attempting normal pick/drop")
+
         ok = pick_and_drop(brick)
         if ok:
             picked += 1
+            separation_attempts = 0
             print(f"✅ Picked count: {picked}")
         else:
             print("⏭ No pick this cycle (rescan next)")
