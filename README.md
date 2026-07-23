@@ -28,17 +28,28 @@ Install Python dependencies:
 python3 -m pip install -r requirements.txt
 ```
 
-Run the FastAPI dashboard:
+Run the FastAPI dashboard in the default non-actuating preview mode:
 
 ```bash
-PYTHONPATH=src python3 -m uvicorn jetarm.ui.server_app:app --reload
+JETARM_ENABLE_ACTUATION=0 PYTHONPATH=src python3 -m uvicorn jetarm.ui.server_app:app --reload
 ```
 
-Run the scanner directly:
+Run one YOLO preview scan directly without moving the robot:
 
 ```bash
-PYTHONPATH=src python3 -m jetarm.vision.scanner
+JETARM_ENABLE_ACTUATION=0 PYTHONPATH=src python3 -m jetarm.sorting.yolo_vision_scanner
 ```
+
+Robot motion and scanner auto-cycle require an explicit opt-in before server
+startup:
+
+```bash
+JETARM_ENABLE_ACTUATION=1 PYTHONPATH=src python3 -m uvicorn jetarm.ui.server_app:app
+```
+
+Use actuation mode only after the E-stop path, workspace, calibration, and scan
+pose have been checked on staged hardware. Resume never clears an E-stop latch;
+clearing and resuming are deliberately separate operations.
 
 Run manual tools:
 

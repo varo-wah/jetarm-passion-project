@@ -1,6 +1,7 @@
 import math
 
 from jetarm.hardware.servo_controller import CKMJetArm
+from jetarm.hardware.safety_state import MOTION_SAFETY
 
 class _UnavailableArm:
     def __init__(self, error: Exception):
@@ -133,7 +134,7 @@ class JetArmIK:
                 return False
 
         print(f"Smooth moving to: {pulses['base']}, {pulses['L1']}, {pulses['L2']}, {pulses['L3']}")
-        self.Arm.smoothMoveJetArmGroup(
+        return self.Arm.smoothMoveJetArmGroup(
             {
                 1: pulses["base"],
                 2: pulses["L1"],
@@ -143,9 +144,12 @@ class JetArmIK:
             duration=1.2,
             steps=24,
         )
-        return True
 
     def move_to_wrist(self, x, y, z_wrist):
+        if not MOTION_SAFETY.motion_allowed():
+            print("🛑 Motion safety latch blocked IK movement")
+            return False
+
         # Old behavior (raw IK wrist Z)
         try:
             base_angle, L1_angle, L2_angle, L3_angle = self.calculate_angles(x, y, z_wrist)
@@ -155,14 +159,8 @@ class JetArmIK:
         return self._apply_pulses(base_angle, L1_angle, L2_angle, L3_angle, x, y, z_wrist)
 
     def move_to(self, x, y, z_table):
-        global PAUSED, ESTOP_LATCHED
-
-        if ESTOP_LATCHED:
-            print("🛑 E-STOP active: motion blocked")
-            return False
-
-        if PAUSED:
-            print("⏸️ Paused: motion blocked")
+        if not MOTION_SAFETY.motion_allowed():
+            print("🛑 Motion safety latch blocked IK movement")
             return False
 
         # New default behavior: table-referenced tip height
@@ -183,16 +181,26 @@ class JetArmGripper:
         return int(round(angle_deg / self.DEG_PER_PULSE + self.BASE_ZERO_OFFSET))
 
     def turn_wrist(self, angle):
+        if not MOTION_SAFETY.motion_allowed():
+            print("🛑 Motion safety latch blocked wrist movement")
+            return False
+
         base_angle = self.ik.last_base_angle
         final_angle = (angle - 90.0) + base_angle
         wrist_pulse = self.wrist_to_pulse(final_angle)
-        self.Arm.moveJetArm(5, wrist_pulse)
+        return self.Arm.moveJetArm(5, wrist_pulse)
 
     def close_gripper(self):
-        self.Arm.moveJetArm(10, self.closeGripperPulse)
+        if not MOTION_SAFETY.motion_allowed():
+            print("🛑 Motion safety latch blocked gripper close")
+            return False
+        return self.Arm.moveJetArm(10, self.closeGripperPulse)
 
     def open_gripper(self):
-        self.Arm.moveJetArm(10, self.openGripperPulse)
+        if not MOTION_SAFETY.motion_allowed():
+            print("🛑 Motion safety latch blocked gripper open")
+            return False
+        return self.Arm.moveJetArm(10, self.openGripperPulse)
 
 
 class ComputerVision:
@@ -203,9 +211,11 @@ class ComputerVision:
 
     def scan_position(self):
         # Preserve your previous behavior by using WRIST-Z here:
-        self.ik.move_to_wrist(0, 15, 23)
-        self.gripper.turn_wrist(90)
-        self.gripper.open_gripper()
+        if not self.ik.move_to_wrist(0, 15, 23):
+            return False
+        if not self.gripper.turn_wrist(90):
+            return False
+        return self.gripper.open_gripper()
 
 
 class UserFriendlyMode:
@@ -236,19 +246,33 @@ ufm = UserFriendlyMode(ik, gripper, camera)
 PAUSED = False
 ESTOP_LATCHED = False
 
+
+def _sync_legacy_flags() -> None:
+    global PAUSED, ESTOP_LATCHED
+    snapshot = MOTION_SAFETY.snapshot()
+    PAUSED = snapshot.paused
+    ESTOP_LATCHED = snapshot.estop_latched
+
+
+def motion_is_allowed() -> bool:
+    return MOTION_SAFETY.motion_allowed()
+
+
+def motion_safety_status() -> dict[str, bool]:
+    return MOTION_SAFETY.snapshot().as_dict()
+
 def pause_system() -> bool:
-    global PAUSED
-    PAUSED = True
+    ok = MOTION_SAFETY.pause()
+    _sync_legacy_flags()
     print("⏸️ PAUSED")
-    return True
+    return ok
 
 def resume_system() -> bool:
-    global PAUSED
-    # do not resume if estop is latched
-    if ESTOP_LATCHED:
+    ok = MOTION_SAFETY.resume()
+    _sync_legacy_flags()
+    if not ok:
         print("❌ Cannot resume: E-STOP is latched")
         return False
-    PAUSED = False
     print("▶️ RESUMED")
     return True
 
@@ -257,17 +281,16 @@ def stop_motion() -> bool:
     return pause_system()
 
 def estop_motion() -> bool:
-    global ESTOP_LATCHED, PAUSED
-    ESTOP_LATCHED = True
-    PAUSED = True
+    ok = MOTION_SAFETY.estop()
+    _sync_legacy_flags()
     print("🛑 E-STOP LATCHED (software) — motion should halt at loop level")
-    return True
+    return ok
 
 def clear_estop() -> bool:
-    global ESTOP_LATCHED
-    ESTOP_LATCHED = False
-    print("✅ E-STOP CLEARED")
-    return True
+    ok = MOTION_SAFETY.clear_estop()
+    _sync_legacy_flags()
+    print("✅ E-STOP CLEARED; system remains paused until resume")
+    return ok
 
 if __name__ == "__main__":
     while True:

@@ -13,6 +13,18 @@ from jetarm.hardware.Class_Execution import ik, gripper, camera
 from jetarm.vision.yolo_detector import detect_bricks_yolo as detect_bricks
 from jetarm.vision.wrist_safety import choose_safe_wrist_angle
 
+ACTUATION_ENV = "JETARM_ENABLE_ACTUATION"
+
+
+def env_flag(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+ENABLE_ACTUATION = env_flag(ACTUATION_ENV, default=False)
+
 UI_SERVER = os.environ.get("UI_SERVER", "http://127.0.0.1:8000")
 FRAME_URL = f"{UI_SERVER}/api/frame.jpg"
 
@@ -334,6 +346,13 @@ def pick_and_drop(brick):
 # MAIN LOOP (RESCAN EACH PICK)
 # =========================
 def main():
+    if not ENABLE_ACTUATION:
+        stage(
+            "SCANNER ACTUATION BLOCKED",
+            f"Set {ACTUATION_ENV}=1 before launch to explicitly enable robot motion.",
+        )
+        return
+
     picked = 0
     separation_attempts = 0
 

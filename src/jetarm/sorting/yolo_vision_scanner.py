@@ -13,11 +13,22 @@ import numpy as np
 import requests
 
 from jetarm.hardware.Class_Execution import camera, gripper, ik
-from jetarm.vision.yolo_detector import detect_bricks_yolo, detect_objects, detect_target
+from jetarm.vision.yolo_detector import detect_bricks_yolo
 from jetarm.vision.wrist_safety import choose_safe_wrist_angle
 
 
-ENABLE_PICK_AND_DROP = False
+ACTUATION_ENV = "JETARM_ENABLE_ACTUATION"
+
+
+def env_flag(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+# Preview-only unless the operator explicitly opts in before starting the server.
+ENABLE_PICK_AND_DROP = env_flag(ACTUATION_ENV, default=False)
 
 UI_SERVER = os.environ.get("UI_SERVER", "http://127.0.0.1:8000")
 FRAME_URL = f"{UI_SERVER}/api/frame.jpg"
@@ -116,10 +127,17 @@ def move_wait(x, y, z, label):
     return ok
 
 
-def scan_once():
-    print("[YOLO SCANNER] Moving to scan pose")
-    camera.scan_position()
-    time.sleep(SCAN_SETTLE)
+def scan_once(move_to_scan_pose=None):
+    if move_to_scan_pose is None:
+        move_to_scan_pose = ENABLE_PICK_AND_DROP
+
+    if move_to_scan_pose:
+        print("[YOLO SCANNER] Moving to scan pose")
+        if not camera.scan_position():
+            raise RuntimeError("Scanner motion was blocked before capture")
+        time.sleep(SCAN_SETTLE)
+    else:
+        print("[YOLO SCANNER] Preview mode: leaving robot position unchanged")
 
     print("[YOLO SCANNER] Capturing frame")
     frame = take_snapshot()
@@ -210,10 +228,13 @@ def pick_and_drop(brick):
 
 def main():
     if not ENABLE_PICK_AND_DROP:
-        bricks = scan_once()
+        bricks = scan_once(move_to_scan_pose=False)
         target = choose_brick(bricks)
         print_selected_target(target)
-        print("[YOLO SCANNER] Pick/drop disabled")
+        print(
+            f"[YOLO SCANNER] Preview complete; actuation disabled. "
+            f"Set {ACTUATION_ENV}=1 before server startup to opt in."
+        )
         return
 
     picked = 0

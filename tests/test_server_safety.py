@@ -1,0 +1,135 @@
+import json
+import signal
+import subprocess
+import unittest
+from unittest.mock import patch
+
+from jetarm.hardware import Class_Execution as hardware
+from jetarm.ui import server_app
+
+
+class FakeProcess:
+    def __init__(self, wait_results=None):
+        self.wait_results = list(wait_results or [0])
+        self.signals = []
+        self.terminated = False
+        self.killed = False
+
+    def poll(self):
+        return None
+
+    def send_signal(self, value):
+        self.signals.append(value)
+
+    def terminate(self):
+        self.terminated = True
+
+    def kill(self):
+        self.killed = True
+
+    def wait(self, timeout=None):
+        result = self.wait_results.pop(0)
+        if result == "timeout":
+            raise subprocess.TimeoutExpired("scanner", timeout)
+        return result
+
+
+def response_payload(response):
+    return json.loads(response.body.decode("utf-8"))
+
+
+class ServerSafetyTests(unittest.TestCase):
+    def setUp(self):
+        hardware.clear_estop()
+        hardware.resume_system()
+        server_app._scanner_proc = None
+        server_app._scanner_autocycle_enabled = False
+        server_app._person_follow_stop.set()
+
+    def tearDown(self):
+        server_app._scanner_proc = None
+        server_app._scanner_autocycle_enabled = False
+        hardware.clear_estop()
+        hardware.resume_system()
+
+    def test_scanner_stop_escalates_to_kill(self):
+        proc = FakeProcess(["timeout", "timeout", 0])
+        server_app._scanner_proc = proc
+        server_app._scanner_autocycle_enabled = True
+
+        self.assertTrue(server_app._stop_scanner_process())
+
+        self.assertEqual(proc.signals, [signal.SIGINT])
+        self.assertTrue(proc.terminated)
+        self.assertTrue(proc.killed)
+        self.assertIsNone(server_app._scanner_proc)
+        self.assertFalse(server_app._scanner_autocycle_enabled)
+
+    def test_estop_latches_parent_and_stops_scanner_process(self):
+        proc = FakeProcess([0])
+        server_app._scanner_proc = proc
+        server_app._scanner_autocycle_enabled = True
+
+        response = server_app.api_cmd({"type": "estop"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response_payload(response)["ok"])
+        self.assertEqual(proc.signals, [signal.SIGINT])
+        self.assertTrue(hardware.motion_safety_status()["estop_latched"])
+        self.assertIsNone(server_app._scanner_proc)
+
+    def test_manual_gripper_command_is_blocked_while_scanner_runs(self):
+        server_app._scanner_proc = FakeProcess()
+
+        with patch.object(server_app.gripper, "close_gripper") as close_gripper:
+            response = server_app.api_cmd({"type": "close_gripper"})
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("scanner", response_payload(response)["error"].lower())
+        close_gripper.assert_not_called()
+
+    def test_preview_configuration_blocks_manual_robot_motion(self):
+        with patch.object(server_app, "SCANNER_ACTUATION_ENABLED", False), patch.object(
+            server_app.gripper,
+            "open_gripper",
+        ) as open_gripper:
+            response = server_app.api_cmd({"type": "open_gripper"})
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("actuation disabled", response_payload(response)["error"].lower())
+        open_gripper.assert_not_called()
+
+    def test_clear_estop_keeps_system_paused_until_explicit_resume(self):
+        hardware.estop_motion()
+
+        response = server_app.api_cmd({"type": "clear_estop"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response_payload(response)["paused"])
+        safety = hardware.motion_safety_status()
+        self.assertFalse(safety["estop_latched"])
+        self.assertTrue(safety["paused"])
+
+    def test_scanner_launch_forces_preview_mode_by_default(self):
+        with patch.object(server_app, "SCANNER_ACTUATION_ENABLED", False), patch.object(
+            server_app.subprocess,
+            "Popen",
+            return_value=FakeProcess(),
+        ) as popen:
+            server_app._launch_scanner_process_unlocked()
+
+        args, kwargs = popen.call_args
+        self.assertEqual(args[0][-1], "jetarm.sorting.yolo_vision_scanner")
+        self.assertEqual(kwargs["env"]["JETARM_ENABLE_ACTUATION"], "0")
+        self.assertTrue(kwargs["start_new_session"])
+
+    def test_status_exposes_scanner_and_motion_safety_modes(self):
+        response = server_app.api_status()
+        payload = response_payload(response)
+
+        self.assertFalse(payload["scanner_actuation_enabled"])
+        self.assertTrue(payload["motion_safety"]["motion_allowed"])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -378,6 +378,7 @@
               <div class="kv">
                 <div>Sort count</div><div class="v" id="countText">--</div>
                 <div>Scanner</div><div class="v" id="scannerText2">--</div>
+                <div>Actuation</div><div class="v" id="actuationText">--</div>
                 <div>Person follow</div><div class="v" id="personFollowText">--</div>
                 <div>Jog target</div><div class="v" id="jogText">--</div>
                 <div>Last error</div><div class="v" id="errText">--</div>
@@ -390,7 +391,7 @@
                 <button class="btn btn-good" id="btnScannerStart">Start Scanner Cycle</button>
                 <button class="btn btn-danger" id="btnScannerStop">Stop Scanner</button>
               </div>
-              <div class="hint">Runs YOLO sorting, presses the button when finished, then restarts until stopped.</div>
+              <div class="hint">Preview mode performs one YOLO scan without robot motion. Actuation mode sorts, presses the button, and restarts until stopped.</div>
             </div>
 
             <div class="panel">
@@ -403,6 +404,10 @@
                 <button class="btn btn-danger" id="btnStop">Stop</button>
                 <button class="btn btn-danger" id="btnEstop">E-Stop</button>
               </div>
+              <div class="row" style="margin-top:8px">
+                <button class="btn btn-warn" id="btnClearEstop">Clear E-Stop Latch</button>
+              </div>
+              <div class="hint">Clearing the E-stop leaves motion paused. Resume is a separate action.</div>
             </div>
 
             <div class="panel">
@@ -496,7 +501,7 @@
             <div class="program-grid">
               <div class="program">
                 <b>YOLO Scanner</b>
-                <span>jetarm.sorting.Vision_Scanner</span>
+                <span>jetarm.sorting.yolo_vision_scanner</span>
               </div>
               <div class="program">
                 <b>YOLO Overlay</b>
@@ -635,6 +640,10 @@
       $("btnEstop").onclick = async () => {
         await fireImmediateCmd($("btnEstop"), "estop", "E-Stop Sent");
       };
+      $("btnClearEstop").onclick = async () => {
+        if (!confirm("Clear the software E-stop latch? Motion will remain paused until Resume is pressed.")) return;
+        await fireImmediateCmd($("btnClearEstop"), "clear_estop", "Latch Cleared");
+      };
 
       $("btnScannerStart").onclick = async () => {
         try { await postScanner("/api/scanner/start"); }
@@ -704,6 +713,7 @@
           $("errText").textContent = s.last_error ?? "--";
           $("serverTime").textContent = s.server_time ?? "--";
           setScannerText(!!s.scanner_running);
+          $("actuationText").textContent = s.scanner_actuation_enabled ? "ENABLED" : "PREVIEW ONLY";
           $("personFollowText").textContent = s.person_follow_running ? "RUNNING" : "OFF";
 
           if (Number.isFinite(Number(s.joy_speed))) joySpeed = Number(s.joy_speed);
