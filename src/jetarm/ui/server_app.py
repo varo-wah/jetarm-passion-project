@@ -618,6 +618,7 @@ def api_cmd(cmd: dict = Body(...)):
             _request_scanner_autocycle_stop()
             _stop_scanner_process()
             clear_estop()
+            pause_system()
             _status["state"] = "PAUSED"
             _status["last_error"] = "--"
             return JSONResponse({
