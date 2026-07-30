@@ -713,7 +713,11 @@
           $("errText").textContent = s.last_error ?? "--";
           $("serverTime").textContent = s.server_time ?? "--";
           setScannerText(!!s.scanner_running);
-          $("actuationText").textContent = s.scanner_actuation_enabled ? "ENABLED" : "PREVIEW ONLY";
+          if (s.scanner_actuation_requested && !s.hardware_available){
+            $("actuationText").textContent = "ROS UNAVAILABLE";
+          } else {
+            $("actuationText").textContent = s.scanner_actuation_enabled ? "ENABLED" : "PREVIEW ONLY";
+          }
           $("personFollowText").textContent = s.person_follow_running ? "RUNNING" : "OFF";
 
           if (Number.isFinite(Number(s.joy_speed))) joySpeed = Number(s.joy_speed);

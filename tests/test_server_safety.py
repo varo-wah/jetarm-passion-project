@@ -45,6 +45,9 @@ class ServerSafetyTests(unittest.TestCase):
         server_app._scanner_proc = None
         server_app._scanner_autocycle_enabled = False
         server_app._person_follow_stop.set()
+        server_app._status["state"] = "IDLE"
+        server_app._status["last_action"] = "--"
+        server_app._status["last_error"] = "--"
 
     def tearDown(self):
         server_app._scanner_proc = None
@@ -121,13 +124,55 @@ class ServerSafetyTests(unittest.TestCase):
         args, kwargs = popen.call_args
         self.assertEqual(args[0][-1], "jetarm.sorting.yolo_vision_scanner")
         self.assertEqual(kwargs["env"]["JETARM_ENABLE_ACTUATION"], "0")
+        self.assertEqual(kwargs["env"]["PYTHONUNBUFFERED"], "1")
         self.assertTrue(kwargs["start_new_session"])
+
+    def test_scanner_failure_is_reported_when_autocycle_is_disabled(self):
+        proc = FakeProcess([7])
+        server_app._scanner_proc = proc
+        server_app._scanner_autocycle_enabled = False
+        server_app._status["state"] = "SCANNER_RUNNING"
+
+        server_app._scanner_autocycle_loop()
+
+        self.assertEqual(server_app._status["state"], "SCANNER_ERROR")
+        self.assertEqual(server_app._status["last_action"], "scanner_exited")
+        self.assertEqual(server_app._status["last_error"], "YOLO scanner exited with code 7")
+        self.assertIsNone(server_app._scanner_proc)
+
+    def test_shutdown_stops_camera_after_workers(self):
+        with patch.object(server_app, "_request_person_follow_stop") as stop_follow, patch.object(
+            server_app,
+            "_stop_scanner_process",
+        ) as stop_scanner, patch.object(server_app, "stop_camera") as stop_camera:
+            server_app.on_shutdown()
+
+        stop_follow.assert_called_once_with()
+        stop_scanner.assert_called_once_with()
+        stop_camera.assert_called_once_with()
+
+    def test_actuating_scanner_is_rejected_when_ros_hardware_is_unavailable(self):
+        with patch.object(server_app, "SCANNER_ACTUATION_REQUESTED", True), patch.object(
+            server_app,
+            "HARDWARE_AVAILABLE",
+            False,
+        ), patch.object(
+            server_app,
+            "HARDWARE_UNAVAILABLE_REASON",
+            "No module named rclpy",
+        ), patch.object(server_app, "_launch_scanner_process_unlocked") as launch:
+            response = server_app.scanner_start()
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("rclpy", response_payload(response)["error"])
+        launch.assert_not_called()
 
     def test_status_exposes_scanner_and_motion_safety_modes(self):
         response = server_app.api_status()
         payload = response_payload(response)
 
         self.assertFalse(payload["scanner_actuation_enabled"])
+        self.assertIn("hardware_available", payload)
         self.assertTrue(payload["motion_safety"]["motion_allowed"])
 
 

@@ -3,20 +3,26 @@
 Run the FastAPI dashboard in non-actuating preview mode:
 
 ```bash
-JETARM_ENABLE_ACTUATION=0 PYTHONPATH=src python3 -m uvicorn jetarm.ui.server_app:app --reload
+./scripts/run_jetarm.sh --preview
 ```
 
 Run one YOLO preview scan without moving the robot:
 
 ```bash
-JETARM_ENABLE_ACTUATION=0 PYTHONPATH=src python3 -m jetarm.sorting.yolo_vision_scanner
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" \
+JETARM_ENABLE_ACTUATION=0 \
+python3 -m jetarm.sorting.yolo_vision_scanner
 ```
 
 Enable robot motion only during supervised, staged hardware validation:
 
 ```bash
-JETARM_ENABLE_ACTUATION=1 PYTHONPATH=src python3 -m uvicorn jetarm.ui.server_app:app
+./scripts/run_jetarm.sh --actuate
 ```
+
+The launcher preserves the JetArm ROS environment and checks `rclpy` plus
+`ros_robot_controller_msgs` before starting actuation mode. Do not replace the
+ROS path with a direct `PYTHONPATH=src` assignment.
 
 The dashboard's stop, pause, E-stop, scanner, person-follow, and manual-motion
 paths are software controls. They do not replace the robot's physical power

@@ -31,20 +31,22 @@ python3 -m pip install -r requirements.txt
 Run the FastAPI dashboard in the default non-actuating preview mode:
 
 ```bash
-JETARM_ENABLE_ACTUATION=0 PYTHONPATH=src python3 -m uvicorn jetarm.ui.server_app:app --reload
+./scripts/run_jetarm.sh --preview
 ```
 
 Run one YOLO preview scan directly without moving the robot:
 
 ```bash
-JETARM_ENABLE_ACTUATION=0 PYTHONPATH=src python3 -m jetarm.sorting.yolo_vision_scanner
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" \
+JETARM_ENABLE_ACTUATION=0 \
+python3 -m jetarm.sorting.yolo_vision_scanner
 ```
 
 Robot motion and scanner auto-cycle require an explicit opt-in before server
 startup:
 
 ```bash
-JETARM_ENABLE_ACTUATION=1 PYTHONPATH=src python3 -m uvicorn jetarm.ui.server_app:app
+./scripts/run_jetarm.sh --actuate
 ```
 
 Use actuation mode only after the E-stop path, workspace, calibration, and scan
@@ -54,10 +56,13 @@ clearing and resuming are deliberately separate operations.
 Run manual tools:
 
 ```bash
-PYTHONPATH=src python3 scripts/depth_viewer.py
-PYTHONPATH=src python3 scripts/run_viewer.py
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" python3 scripts/depth_viewer.py
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" python3 scripts/run_viewer.py
 ```
 
 ROS 2 packages such as `rclpy`, `sensor_msgs`, `cv_bridge`, and `ros_robot_controller_msgs` must come from the JetArm ROS environment, not standard `pip`.
+Do not use a direct `PYTHONPATH=src` assignment in a ROS shell: it replaces
+the ROS package paths. The launcher preserves them and verifies hardware imports
+before actuation mode starts.
 
 For now, IK stays in `src/jetarm/hardware/arm_controller.py` because it is still tightly connected to servo pulse conversion and arm movement. Split it into a separate `kinematics.py` module only when it becomes independently testable.

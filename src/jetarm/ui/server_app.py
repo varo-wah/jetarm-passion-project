@@ -13,7 +13,7 @@ from fastapi import Body, FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from jetarm.ui.camera_worker import get_latest_frame_copy, start_camera
+from jetarm.ui.camera_worker import get_latest_frame_copy, start_camera, stop_camera
 
 # Robot control (manual moves/gripper/home)
 from jetarm.hardware.Class_Execution import (
@@ -21,6 +21,7 @@ from jetarm.hardware.Class_Execution import (
     stop_motion, estop_motion,
     pause_system, resume_system,
     clear_estop, motion_is_allowed, motion_safety_status,
+    hardware_is_available, hardware_unavailable_reason,
 )
 from jetarm.ui.viewer_overlay import annotate_frame
 from jetarm.ui.yolo_overlay import annotate_yolo_frame
@@ -60,12 +61,17 @@ def on_startup() -> None:
     # Match scripts/yolo_viewer.py capture settings so website YOLO uses the
     # same frame geometry as the calibration/debug path.
     start_camera(cam_index=0, width=640, height=480, fps=15)
+    if SCANNER_ACTUATION_REQUESTED and not HARDWARE_AVAILABLE:
+        _status["state"] = "CONFIG_ERROR"
+        _status["last_action"] = "hardware_preflight"
+        _status["last_error"] = _hardware_unavailable_error()
 
 
 @app.on_event("shutdown")
 def on_shutdown() -> None:
     _request_person_follow_stop()
     _stop_scanner_process()
+    stop_camera()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -180,7 +186,10 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-SCANNER_ACTUATION_ENABLED = _env_flag(SCANNER_ACTUATION_ENV, default=False)
+SCANNER_ACTUATION_REQUESTED = _env_flag(SCANNER_ACTUATION_ENV, default=False)
+HARDWARE_AVAILABLE = hardware_is_available()
+HARDWARE_UNAVAILABLE_REASON = hardware_unavailable_reason()
+SCANNER_ACTUATION_ENABLED = SCANNER_ACTUATION_REQUESTED and HARDWARE_AVAILABLE
 
 PERSON_FOLLOW_CONFIDENCE = 0.45
 PERSON_FOLLOW_DEADZONE_PX = 70
@@ -204,6 +213,7 @@ def _launch_scanner_process_unlocked() -> subprocess.Popen:
     # IMPORTANT: force Vision_Scanner to use THIS server for frames (no camera conflict)
     env["UI_SERVER"] = "http://127.0.0.1:8000"
     env[SCANNER_ACTUATION_ENV] = "1" if SCANNER_ACTUATION_ENABLED else "0"
+    env["PYTHONUNBUFFERED"] = "1"
 
     return subprocess.Popen(
         [sys.executable, "-m", SCANNER_MODULE],
@@ -266,6 +276,14 @@ def _scanner_autocycle_loop() -> None:
             _scanner_proc = None
             autocycle_enabled = _scanner_autocycle_enabled
 
+        if exit_code != 0:
+            with _scanner_lock:
+                _scanner_autocycle_enabled = False
+            _status["state"] = "SCANNER_ERROR"
+            _status["last_action"] = "scanner_exited"
+            _status["last_error"] = f"YOLO scanner exited with code {exit_code}"
+            return
+
         if not autocycle_enabled:
             if _status.get("state") == "SCANNER_RUNNING":
                 _status["state"] = "IDLE"
@@ -276,14 +294,6 @@ def _scanner_autocycle_loop() -> None:
                 _scanner_autocycle_enabled = False
             _status["state"] = "IDLE"
             _status["last_error"] = "Scanner auto-cycle blocked by safety configuration"
-            return
-
-        if exit_code != 0:
-            with _scanner_lock:
-                _scanner_autocycle_enabled = False
-            _status["state"] = "SCANNER_ERROR"
-            _status["last_action"] = "scanner_exited"
-            _status["last_error"] = f"Vision_Scanner exited with code {exit_code}; auto-cycle stopped"
             return
 
         _status["state"] = "PRESSING_BUTTON"
@@ -346,11 +356,18 @@ def _request_person_follow_stop() -> None:
     _person_follow_stop.set()
 
 
+def _hardware_unavailable_error() -> str:
+    detail = HARDWARE_UNAVAILABLE_REASON or "ROS hardware imports failed"
+    return f"Robot hardware unavailable: {detail}"
+
+
 def _manual_motion_conflict() -> str | None:
     if _scanner_is_running():
         return "Manual motion blocked while scanner is running"
     if _person_follow_is_running():
         return "Manual motion blocked while person follow is running"
+    if SCANNER_ACTUATION_REQUESTED and not HARDWARE_AVAILABLE:
+        return _hardware_unavailable_error()
     if not SCANNER_ACTUATION_ENABLED:
         return f"Robot actuation disabled; restart with {SCANNER_ACTUATION_ENV}=1 to enable motion"
 
@@ -500,6 +517,8 @@ def api_status():
     payload["scanner_running"] = _scanner_is_running()
     payload["scanner_autocycle_enabled"] = _scanner_autocycle_enabled
     payload["scanner_actuation_enabled"] = SCANNER_ACTUATION_ENABLED
+    payload["scanner_actuation_requested"] = SCANNER_ACTUATION_REQUESTED
+    payload["hardware_available"] = HARDWARE_AVAILABLE
     payload["person_follow_running"] = _person_follow_is_running()
     payload["motion_safety"] = motion_safety_status()
 
@@ -694,6 +713,9 @@ def scanner_start():
     global _scanner_proc, _scanner_autocycle_enabled
 
     with _motion_operation_lock:
+        if SCANNER_ACTUATION_REQUESTED and not HARDWARE_AVAILABLE:
+            _status["last_error"] = _hardware_unavailable_error()
+            return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=503)
         if _person_follow_is_running():
             _status["last_error"] = "Stop person follow before starting scanner"
             return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=409)

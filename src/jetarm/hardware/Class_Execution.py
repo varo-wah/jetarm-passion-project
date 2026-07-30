@@ -25,6 +25,24 @@ except RuntimeError as exc:
     Arm = _UnavailableArm(exc)
 
 
+def hardware_is_available() -> bool:
+    return not isinstance(Arm, _UnavailableArm)
+
+
+def hardware_unavailable_reason() -> str | None:
+    if hardware_is_available():
+        return None
+
+    error = Arm.error
+    root_cause = error
+    while root_cause.__cause__ is not None:
+        root_cause = root_cause.__cause__
+
+    if root_cause is error:
+        return str(error)
+    return f"{error}: {root_cause}"
+
+
 class JetArmIK:
     """
     move_to(x,y,z): Z is TABLE-REFERENCED TIP HEIGHT (cm above table) ✅
