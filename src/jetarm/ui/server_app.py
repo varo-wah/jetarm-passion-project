@@ -21,6 +21,7 @@ from jetarm.hardware.Class_Execution import (
     stop_motion, estop_motion,
     pause_system, resume_system,
     clear_estop, motion_is_allowed, motion_safety_status,
+    safe_shutdown,
     hardware_is_available, hardware_unavailable_reason,
 )
 from jetarm.ui.viewer_overlay import annotate_frame
@@ -70,7 +71,10 @@ def on_startup() -> None:
 @app.on_event("shutdown")
 def on_shutdown() -> None:
     _request_person_follow_stop()
+    stop_motion()
     _stop_scanner_process()
+    if SCANNER_ACTUATION_ENABLED:
+        safe_shutdown()
     stop_camera()
 
 
@@ -756,13 +760,21 @@ def scanner_start():
 @app.post("/api/scanner/stop")
 def scanner_stop():
     was_running = _scanner_is_running()
+    # Priority first: cancel controller motion before waiting on the worker.
+    stop_motion()
     _stop_scanner_process()
 
     _status["state"] = "IDLE"
     _status["last_action"] = "scanner_stop"
-    payload = {"ok": True, "running": False, "autocycle": False}
+    payload = {
+        "ok": True,
+        "running": False,
+        "autocycle": False,
+        "paused": True,
+        "note": "Scanner stopped; press Resume before starting motion again",
+    }
     if not was_running:
-        payload["note"] = "YOLO scanner not running"
+        payload["note"] = "YOLO scanner was not running; controller remains paused"
     return JSONResponse(payload)
 
 

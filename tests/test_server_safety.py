@@ -68,6 +68,25 @@ class ServerSafetyTests(unittest.TestCase):
         self.assertIsNone(server_app._scanner_proc)
         self.assertFalse(server_app._scanner_autocycle_enabled)
 
+    def test_scanner_stop_pauses_controller_before_signaling_worker(self):
+        events = []
+        server_app._scanner_proc = FakeProcess([0])
+
+        with patch.object(
+            server_app,
+            "stop_motion",
+            side_effect=lambda: events.append("controller_pause") or True,
+        ), patch.object(
+            server_app._scanner_proc,
+            "send_signal",
+            side_effect=lambda value: events.append("worker_signal"),
+        ):
+            response = server_app.scanner_stop()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(events, ["controller_pause", "worker_signal"])
+        self.assertTrue(response_payload(response)["paused"])
+
     def test_estop_latches_parent_and_stops_scanner_process(self):
         proc = FakeProcess([0])
         server_app._scanner_proc = proc
@@ -150,6 +169,42 @@ class ServerSafetyTests(unittest.TestCase):
         stop_follow.assert_called_once_with()
         stop_scanner.assert_called_once_with()
         stop_camera.assert_called_once_with()
+
+    def test_actuating_shutdown_pauses_then_requests_safe_pose(self):
+        events = []
+        with patch.object(server_app, "SCANNER_ACTUATION_ENABLED", True), patch.object(
+            server_app,
+            "_request_person_follow_stop",
+            side_effect=lambda: events.append("follow_stop"),
+        ), patch.object(
+            server_app,
+            "stop_motion",
+            side_effect=lambda: events.append("controller_pause") or True,
+        ), patch.object(
+            server_app,
+            "_stop_scanner_process",
+            side_effect=lambda: events.append("scanner_stop") or True,
+        ), patch.object(
+            server_app,
+            "safe_shutdown",
+            side_effect=lambda: events.append("safe_shutdown") or True,
+        ), patch.object(
+            server_app,
+            "stop_camera",
+            side_effect=lambda: events.append("camera_stop"),
+        ):
+            server_app.on_shutdown()
+
+        self.assertEqual(
+            events,
+            [
+                "follow_stop",
+                "controller_pause",
+                "scanner_stop",
+                "safe_shutdown",
+                "camera_stop",
+            ],
+        )
 
     def test_actuating_scanner_is_rejected_when_ros_hardware_is_unavailable(self):
         with patch.object(server_app, "SCANNER_ACTUATION_REQUESTED", True), patch.object(

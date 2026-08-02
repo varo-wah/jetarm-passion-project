@@ -7,7 +7,8 @@ William Alvaro Hartono's passion project (AI Sorting Machine). An exploration of
 jetarm-passion-project/
 ├── src/jetarm/
 │   ├── config/      # constants, paths, robot/camera/vision/YOLO settings
-│   ├── hardware/    # ROS servo, arm/gripper control, and current IK logic
+│   ├── control/     # centralized ROS motion authority and clients
+│   ├── hardware/    # arm/gripper compatibility API and current IK logic
 │   ├── vision/      # runtime camera detection, scanner, YOLO inference
 │   ├── ml/          # YOLO training and dataset pipeline code
 │   ├── sorting/     # high-level sorting workflows
@@ -49,6 +50,11 @@ startup:
 ./scripts/run_jetarm.sh --actuate
 ```
 
+The launcher starts `jetarm_control_node` before the dashboard. This node is the
+only process allowed to publish the vendor servo command topic. Actuation starts
+in `BOOT_LOCKED`; press **Resume** once the workspace is clear. Stop or scanner
+stop returns the controller to `PAUSED`, and clearing E-stop never resumes it.
+
 Use actuation mode only after the E-stop path, workspace, calibration, and scan
 pose have been checked on staged hardware. Resume never clears an E-stop latch;
 clearing and resuming are deliberately separate operations.
@@ -65,4 +71,7 @@ Do not use a direct `PYTHONPATH=src` assignment in a ROS shell: it replaces
 the ROS package paths. The launcher preserves them and verifies hardware imports
 before actuation mode starts.
 
-For now, IK stays in `src/jetarm/hardware/arm_controller.py` because it is still tightly connected to servo pulse conversion and arm movement. Split it into a separate `kinematics.py` module only when it becomes independently testable.
+Per-joint pulse ranges, speed limits, and the safe shutdown pose live in
+`src/jetarm/config/joint_limits.yaml`. They are an initial software calibration
+baseline and must be physically measured and signed off before Phase 0 is
+declared complete.

@@ -8,7 +8,7 @@ class _UnavailableArm:
     def __init__(self, error: Exception):
         self.error = error
 
-    def moveJetArm(self, servo_id, target_position):
+    def moveJetArm(self, servo_id, target_position, duration=1.0):
         raise RuntimeError("JetArm hardware is unavailable in this environment") from self.error
 
     def moveJetArmGroup(self, positions, duration=1.0):
@@ -16,6 +16,24 @@ class _UnavailableArm:
 
     def smoothMoveJetArmGroup(self, positions, duration=1.2, steps=24):
         raise RuntimeError("JetArm hardware is unavailable in this environment") from self.error
+
+    def safety_status(self):
+        return MOTION_SAFETY.snapshot().as_dict()
+
+    def pause(self):
+        return MOTION_SAFETY.pause()
+
+    def resume(self):
+        return MOTION_SAFETY.resume()
+
+    def estop(self):
+        return MOTION_SAFETY.estop()
+
+    def clear_estop(self):
+        return MOTION_SAFETY.clear_estop()
+
+    def safe_shutdown(self):
+        return MOTION_SAFETY.pause()
 
 
 # Instantiate hardware once per process when ROS is available.
@@ -165,7 +183,7 @@ class JetArmIK:
         )
 
     def move_to_wrist(self, x, y, z_wrist):
-        if not MOTION_SAFETY.motion_allowed():
+        if not motion_is_allowed():
             print("🛑 Motion safety latch blocked IK movement")
             return False
 
@@ -178,7 +196,7 @@ class JetArmIK:
         return self._apply_pulses(base_angle, L1_angle, L2_angle, L3_angle, x, y, z_wrist)
 
     def move_to(self, x, y, z_table):
-        if not MOTION_SAFETY.motion_allowed():
+        if not motion_is_allowed():
             print("🛑 Motion safety latch blocked IK movement")
             return False
 
@@ -200,7 +218,7 @@ class JetArmGripper:
         return int(round(angle_deg / self.DEG_PER_PULSE + self.BASE_ZERO_OFFSET))
 
     def turn_wrist(self, angle):
-        if not MOTION_SAFETY.motion_allowed():
+        if not motion_is_allowed():
             print("🛑 Motion safety latch blocked wrist movement")
             return False
 
@@ -210,13 +228,13 @@ class JetArmGripper:
         return self.Arm.moveJetArm(5, wrist_pulse)
 
     def close_gripper(self):
-        if not MOTION_SAFETY.motion_allowed():
+        if not motion_is_allowed():
             print("🛑 Motion safety latch blocked gripper close")
             return False
         return self.Arm.moveJetArm(10, self.closeGripperPulse)
 
     def open_gripper(self):
-        if not MOTION_SAFETY.motion_allowed():
+        if not motion_is_allowed():
             print("🛑 Motion safety latch blocked gripper open")
             return False
         return self.Arm.moveJetArm(10, self.openGripperPulse)
@@ -261,7 +279,7 @@ class UserFriendlyMode:
         self.camera = camera
 
     def _motion_allowed(self):
-        if not MOTION_SAFETY.motion_allowed():
+        if not motion_is_allowed():
             print("[USER FRIENDLY] Motion safety latch blocked movement")
             return False
         return True
@@ -410,26 +428,28 @@ ESTOP_LATCHED = False
 
 def _sync_legacy_flags() -> None:
     global PAUSED, ESTOP_LATCHED
-    snapshot = MOTION_SAFETY.snapshot()
-    PAUSED = snapshot.paused
-    ESTOP_LATCHED = snapshot.estop_latched
+    snapshot = motion_safety_status()
+    PAUSED = bool(snapshot["paused"])
+    ESTOP_LATCHED = bool(snapshot["estop_latched"])
 
 
 def motion_is_allowed() -> bool:
-    return MOTION_SAFETY.motion_allowed()
+    return bool(motion_safety_status()["motion_allowed"])
 
 
-def motion_safety_status() -> dict[str, bool]:
+def motion_safety_status() -> dict[str, object]:
+    if hardware_is_available():
+        return Arm.safety_status()
     return MOTION_SAFETY.snapshot().as_dict()
 
 def pause_system() -> bool:
-    ok = MOTION_SAFETY.pause()
+    ok = Arm.pause()
     _sync_legacy_flags()
     print("⏸️ PAUSED")
     return ok
 
 def resume_system() -> bool:
-    ok = MOTION_SAFETY.resume()
+    ok = Arm.resume()
     _sync_legacy_flags()
     if not ok:
         print("❌ Cannot resume: E-STOP is latched")
@@ -442,15 +462,22 @@ def stop_motion() -> bool:
     return pause_system()
 
 def estop_motion() -> bool:
-    ok = MOTION_SAFETY.estop()
+    ok = Arm.estop()
     _sync_legacy_flags()
     print("🛑 E-STOP LATCHED (software) — motion should halt at loop level")
     return ok
 
 def clear_estop() -> bool:
-    ok = MOTION_SAFETY.clear_estop()
+    ok = Arm.clear_estop()
     _sync_legacy_flags()
     print("✅ E-STOP CLEARED; system remains paused until resume")
+    return ok
+
+
+def safe_shutdown() -> bool:
+    """Cancel active work and request the controller's calibrated safe pose."""
+    ok = Arm.safe_shutdown()
+    _sync_legacy_flags()
     return ok
 
 if __name__ == "__main__":

@@ -1,0 +1,65 @@
+{
+  "calibration_status": "software_baseline_requires_physical_verification",
+  "joints": [
+    {
+      "name": "base_joint",
+      "servo_id": 1,
+      "min_pulse": 0,
+      "max_pulse": 980,
+      "center_pulse": 500,
+      "radians_per_pulse": 0.0041887902047863905,
+      "max_velocity_pulses_per_second": 400,
+      "safe_pose_pulse": 500
+    },
+    {
+      "name": "shoulder_joint",
+      "servo_id": 2,
+      "min_pulse": 120,
+      "max_pulse": 850,
+      "center_pulse": 500,
+      "radians_per_pulse": 0.0041887902047863905,
+      "max_velocity_pulses_per_second": 300,
+      "safe_pose_pulse": 461
+    },
+    {
+      "name": "elbow_joint",
+      "servo_id": 3,
+      "min_pulse": 120,
+      "max_pulse": 850,
+      "center_pulse": 500,
+      "radians_per_pulse": 0.0041887902047863905,
+      "max_velocity_pulses_per_second": 300,
+      "safe_pose_pulse": 302
+    },
+    {
+      "name": "wrist_pitch_joint",
+      "servo_id": 4,
+      "min_pulse": 10,
+      "max_pulse": 700,
+      "center_pulse": 500,
+      "radians_per_pulse": 0.0041887902047863905,
+      "max_velocity_pulses_per_second": 350,
+      "safe_pose_pulse": 22
+    },
+    {
+      "name": "wrist_rotate_joint",
+      "servo_id": 5,
+      "min_pulse": 20,
+      "max_pulse": 980,
+      "center_pulse": 500,
+      "radians_per_pulse": 0.0041887902047863905,
+      "max_velocity_pulses_per_second": 650,
+      "safe_pose_pulse": 500
+    },
+    {
+      "name": "gripper_joint",
+      "servo_id": 10,
+      "min_pulse": 100,
+      "max_pulse": 750,
+      "center_pulse": 500,
+      "radians_per_pulse": 0.0041887902047863905,
+      "max_velocity_pulses_per_second": 650,
+      "safe_pose_pulse": 150
+    }
+  ]
+}
