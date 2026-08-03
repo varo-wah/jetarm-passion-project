@@ -50,10 +50,11 @@ startup:
 ./scripts/run_jetarm.sh --actuate
 ```
 
-The launcher starts `jetarm_control_node` before the dashboard. This node is the
-only process allowed to publish the vendor servo command topic. Actuation starts
-in `BOOT_LOCKED`; press **Resume** once the workspace is clear. Stop or scanner
-stop returns the controller to `PAUSED`, and clearing E-stop never resumes it.
+The launcher stops Hiwonder's `start_app_node.service`, starts the base JetArm
+SDK driver, verifies exclusive ownership of the vendor servo command topic, and
+then starts `jetarm_control_node` plus the dashboard. Actuation starts in
+`BOOT_LOCKED`; press **Resume** once the workspace is clear. Stop or scanner stop
+returns the controller to `PAUSED`, and clearing E-stop never resumes it.
 
 Use actuation mode only after the E-stop path, workspace, calibration, and scan
 pose have been checked on staged hardware. Resume never clears an E-stop latch;

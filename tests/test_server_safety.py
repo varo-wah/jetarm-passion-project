@@ -163,12 +163,16 @@ class ServerSafetyTests(unittest.TestCase):
         with patch.object(server_app, "_request_person_follow_stop") as stop_follow, patch.object(
             server_app,
             "_stop_scanner_process",
-        ) as stop_scanner, patch.object(server_app, "stop_camera") as stop_camera:
+        ) as stop_scanner, patch.object(server_app, "stop_camera") as stop_camera, patch.object(
+            server_app,
+            "shutdown_control_client",
+        ) as close_client:
             server_app.on_shutdown()
 
         stop_follow.assert_called_once_with()
         stop_scanner.assert_called_once_with()
         stop_camera.assert_called_once_with()
+        close_client.assert_called_once_with()
 
     def test_actuating_shutdown_pauses_then_requests_safe_pose(self):
         events = []
@@ -192,6 +196,10 @@ class ServerSafetyTests(unittest.TestCase):
             server_app,
             "stop_camera",
             side_effect=lambda: events.append("camera_stop"),
+        ), patch.object(
+            server_app,
+            "shutdown_control_client",
+            side_effect=lambda: events.append("client_close"),
         ):
             server_app.on_shutdown()
 
@@ -203,8 +211,36 @@ class ServerSafetyTests(unittest.TestCase):
                 "scanner_stop",
                 "safe_shutdown",
                 "camera_stop",
+                "client_close",
             ],
         )
+
+    def test_shutdown_releases_remaining_subsystems_after_ros_failure(self):
+        events = []
+        with patch.object(
+            server_app,
+            "_request_person_follow_stop",
+            side_effect=lambda: events.append("follow_stop"),
+        ), patch.object(
+            server_app,
+            "stop_motion",
+            side_effect=RuntimeError("ROS context invalid"),
+        ), patch.object(
+            server_app,
+            "_stop_scanner_process",
+            side_effect=lambda: events.append("scanner_stop"),
+        ), patch.object(
+            server_app,
+            "stop_camera",
+            side_effect=lambda: events.append("camera_stop"),
+        ), patch.object(
+            server_app,
+            "shutdown_control_client",
+            side_effect=lambda: events.append("client_close"),
+        ):
+            server_app.on_shutdown()
+
+        self.assertEqual(events, ["follow_stop", "scanner_stop", "camera_stop", "client_close"])
 
     def test_actuating_scanner_is_rejected_when_ros_hardware_is_unavailable(self):
         with patch.object(server_app, "SCANNER_ACTUATION_REQUESTED", True), patch.object(

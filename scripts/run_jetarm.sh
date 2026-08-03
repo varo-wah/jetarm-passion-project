@@ -60,20 +60,99 @@ fi
 export JETARM_ENABLE_ACTUATION="$actuation_enabled"
 
 controller_pid=""
+sdk_pid=""
+
+topic_endpoint_count() {
+    local endpoint_label="$1"
+    local topic_info
+    topic_info="$(ros2 topic info -v /ros_robot_controller/bus_servo/set_position 2>/dev/null || true)"
+    awk -v label="$endpoint_label" '$1 " " $2 == label ":" {print $3; found=1} END {if (!found) print 0}' <<<"$topic_info"
+}
+
+print_servo_topic_owners() {
+    ros2 topic info -v /ros_robot_controller/bus_servo/set_position 2>/dev/null || true
+}
 
 cleanup() {
-    trap - EXIT INT TERM
+    trap - EXIT TERM
     if [[ -n "$controller_pid" ]] && kill -0 "$controller_pid" 2>/dev/null; then
-        python3 -c "from jetarm.control.client import JetArmControlClient; JetArmControlClient().safe_shutdown()" >/dev/null 2>&1 || true
+        python3 -c "from jetarm.control.client import JetArmControlClient; c = JetArmControlClient(); c.safe_shutdown(); c.close()" >/dev/null 2>&1 || true
         kill -TERM "$controller_pid" 2>/dev/null || true
         wait "$controller_pid" 2>/dev/null || true
     fi
+    if [[ -n "$sdk_pid" ]] && kill -0 "$sdk_pid" 2>/dev/null; then
+        kill -TERM "$sdk_pid" 2>/dev/null || true
+        wait "$sdk_pid" 2>/dev/null || true
+    fi
 }
 
-trap cleanup EXIT INT TERM
+trap cleanup EXIT TERM
 
 if [[ "$actuation_enabled" == "1" ]]; then
-    python3 -m jetarm.control.control_node &
+    if ! command -v setsid >/dev/null 2>&1; then
+        echo "ERROR: setsid is required to preserve safe ROS shutdown ordering." >&2
+        exit 11
+    fi
+
+    if systemctl is-active --quiet start_app_node.service 2>/dev/null; then
+        echo "Stopping Hiwonder auto-start application to establish exclusive servo ownership..."
+        sudo systemctl stop start_app_node.service
+    fi
+
+    # DDS discovery may briefly retain endpoints after systemd has stopped the
+    # vendor application. Refuse to continue until every old command publisher
+    # has disappeared; otherwise there is no centralized motion authority.
+    for _ in {1..20}; do
+        [[ "$(topic_endpoint_count "Publisher count")" == "0" ]] && break
+        sleep 0.25
+    done
+    if [[ "$(topic_endpoint_count "Publisher count")" != "0" ]]; then
+        echo "ERROR: Another node still publishes the JetArm servo-command topic:" >&2
+        print_servo_topic_owners >&2
+        echo "Stop the listed process before retrying; actuation remains disabled." >&2
+        exit 6
+    fi
+
+    if command -v fuser >/dev/null 2>&1; then
+        camera_pids=""
+        for _ in {1..20}; do
+            camera_pids="$(fuser /dev/video0 2>/dev/null || true)"
+            [[ -z "$camera_pids" ]] && break
+            sleep 0.25
+        done
+        if [[ -n "$camera_pids" ]]; then
+            echo "ERROR: /dev/video0 is already owned by process(es): $camera_pids" >&2
+            ps -fp $camera_pids >&2 || true
+            echo "Stop the camera owner before retrying; the dashboard needs exclusive access." >&2
+            exit 7
+        fi
+    fi
+
+    # Keep driver and authority outside the terminal's foreground process group.
+    # Ctrl+C must reach Uvicorn first so its safe-shutdown callback can still
+    # contact both ROS processes before launcher cleanup terminates them.
+    setsid ros2 launch sdk jetarm_sdk.launch.py &
+    sdk_pid=$!
+
+    sdk_ready=0
+    for _ in {1..60}; do
+        if ! kill -0 "$sdk_pid" 2>/dev/null; then
+            echo "ERROR: JetArm SDK driver exited during startup." >&2
+            exit 8
+        fi
+        if [[ "$(topic_endpoint_count "Subscription count")" -ge "1" ]]; then
+            sdk_ready=1
+            break
+        fi
+        sleep 0.25
+    done
+
+    if [[ "$sdk_ready" != "1" ]]; then
+        echo "ERROR: JetArm SDK did not subscribe to the servo-command topic." >&2
+        exit 9
+    fi
+
+    setsid python3 -m jetarm.control.control_node &
     controller_pid=$!
 
     controller_ready=0
@@ -82,7 +161,7 @@ if [[ "$actuation_enabled" == "1" ]]; then
             echo "ERROR: Central JetArm controller exited during startup." >&2
             exit 4
         fi
-        if python3 -c "from jetarm.control.client import JetArmControlClient; JetArmControlClient(wait_seconds=0.25)" >/dev/null 2>&1; then
+        if python3 -c "from jetarm.control.client import JetArmControlClient; c = JetArmControlClient(wait_seconds=0.25); c.close()" >/dev/null 2>&1; then
             controller_ready=1
             break
         fi
@@ -92,6 +171,12 @@ if [[ "$actuation_enabled" == "1" ]]; then
     if [[ "$controller_ready" != "1" ]]; then
         echo "ERROR: Central JetArm controller did not become ready." >&2
         exit 5
+    fi
+
+    if [[ "$(topic_endpoint_count "Publisher count")" != "1" ]]; then
+        echo "ERROR: Exclusive servo publisher verification failed after startup:" >&2
+        print_servo_topic_owners >&2
+        exit 10
     fi
 fi
 

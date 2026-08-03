@@ -12,7 +12,8 @@
 
 ## Required JetArm validation
 
-1. Start with `./scripts/run_jetarm.sh --actuate` and confirm the dashboard remains paused.
+1. Start with `./scripts/run_jetarm.sh --actuate`; confirm the vendor app is
+   stopped, the SDK is launcher-owned, and the dashboard remains paused.
 2. Confirm `/jetarm_controller/follow_joint_trajectory` and all five controller services exist.
 3. Confirm exactly one publisher exists on `/ros_robot_controller/bus_servo/set_position`.
 4. Measure and update every range in `src/jetarm/config/joint_limits.yaml`.

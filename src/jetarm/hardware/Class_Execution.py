@@ -35,6 +35,9 @@ class _UnavailableArm:
     def safe_shutdown(self):
         return MOTION_SAFETY.pause()
 
+    def close(self):
+        return None
+
 
 # Instantiate hardware once per process when ROS is available.
 try:
@@ -479,6 +482,11 @@ def safe_shutdown() -> bool:
     ok = Arm.safe_shutdown()
     _sync_legacy_flags()
     return ok
+
+
+def shutdown_control_client() -> None:
+    """Release the web process's ROS executor after its final safety request."""
+    Arm.close()
 
 if __name__ == "__main__":
     while True:

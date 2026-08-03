@@ -22,6 +22,7 @@ from jetarm.hardware.Class_Execution import (
     pause_system, resume_system,
     clear_estop, motion_is_allowed, motion_safety_status,
     safe_shutdown,
+    shutdown_control_client,
     hardware_is_available, hardware_unavailable_reason,
 )
 from jetarm.ui.viewer_overlay import annotate_frame
@@ -70,12 +71,24 @@ def on_startup() -> None:
 
 @app.on_event("shutdown")
 def on_shutdown() -> None:
-    _request_person_follow_stop()
-    stop_motion()
-    _stop_scanner_process()
+    shutdown_errors: list[str] = []
+
+    def attempt(name: str, operation) -> None:
+        try:
+            operation()
+        except Exception as exc:  # Continue releasing every subsystem on shutdown.
+            shutdown_errors.append(f"{name}: {exc}")
+
+    attempt("person follow stop", _request_person_follow_stop)
+    attempt("controller pause", stop_motion)
+    attempt("scanner stop", _stop_scanner_process)
     if SCANNER_ACTUATION_ENABLED:
-        safe_shutdown()
-    stop_camera()
+        attempt("controller safe shutdown", safe_shutdown)
+    attempt("camera stop", stop_camera)
+    attempt("ROS client close", shutdown_control_client)
+
+    if shutdown_errors:
+        print("Shutdown completed with errors: " + "; ".join(shutdown_errors), file=sys.stderr)
 
 
 @app.get("/", response_class=HTMLResponse)

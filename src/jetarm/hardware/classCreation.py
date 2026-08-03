@@ -55,6 +55,9 @@ class CKMJetArm:
     def safe_shutdown(self):
         return self.control.safe_shutdown()
 
+    def close(self):
+        self.control.close()
+
     def reset(self):
         return self.smoothMoveJetArmGroup(
             {1: 500, 2: 500, 3: 500, 4: 500, 10: 500}, duration=2.0

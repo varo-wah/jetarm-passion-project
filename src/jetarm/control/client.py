@@ -13,9 +13,11 @@ import rclpy
 from builtin_interfaces.msg import Duration
 from control_msgs.action import FollowJointTrajectory
 from rclpy.action import ActionClient
+from rclpy.context import Context
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -28,10 +30,17 @@ class JetArmControlClient:
     """Serialize local callers while the controller serializes the whole robot."""
 
     def __init__(self, wait_seconds: float = 5.0) -> None:
-        if not rclpy.ok():
-            rclpy.init()
+        # Uvicorn owns SIGINT/SIGTERM in the dashboard process. A private ROS
+        # context without rclpy signal handlers prevents Ctrl+C from invalidating
+        # this client before FastAPI has run its safe-shutdown callbacks.
+        self._context = Context()
+        rclpy.init(context=self._context, signal_handler_options=SignalHandlerOptions.NO)
+        self._closed = False
         suffix = f"{os.getpid()}_{uuid.uuid4().hex[:8]}"
-        self.node: Node = rclpy.create_node(f"jetarm_control_client_{suffix}")
+        self.node: Node = rclpy.create_node(
+            f"jetarm_control_client_{suffix}",
+            context=self._context,
+        )
         self._limits = load_joint_limits()
         self._action = ActionClient(self.node, FollowJointTrajectory, ACTION_NAME)
         self._services = {
@@ -54,7 +63,7 @@ class JetArmControlClient:
         state_qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
         self.node.create_subscription(String, STATE_TOPIC, self._state_callback, state_qos)
 
-        self._executor = MultiThreadedExecutor(num_threads=2)
+        self._executor = MultiThreadedExecutor(num_threads=2, context=self._context)
         self._executor.add_node(self.node)
         self._spin_thread = threading.Thread(
             target=self._executor.spin,
@@ -156,3 +165,13 @@ class JetArmControlClient:
 
     def safe_shutdown(self) -> bool:
         return self.call("safe_shutdown", timeout=5.0)
+
+    def close(self) -> None:
+        """Stop the executor and release this client's private ROS context."""
+        if self._closed:
+            return
+        self._closed = True
+        self._executor.shutdown(timeout_sec=2.0)
+        self.node.destroy_node()
+        if self._context.ok():
+            rclpy.shutdown(context=self._context)
