@@ -22,7 +22,8 @@ Enable robot motion only during supervised, staged hardware validation:
 
 The launcher preserves the JetArm ROS environment and checks `rclpy` plus
 `ros_robot_controller_msgs` before starting actuation mode. It also stops the
-vendor auto-start application, launches the base SDK driver, refuses competing
+vendor auto-start application, launches only the low-level
+`ros_robot_controller` driver, refuses competing
 servo publishers or camera owners, and keeps the ROS processes alive until the
 dashboard has completed safe shutdown. Do not replace the ROS path with a direct
 `PYTHONPATH=src` assignment.

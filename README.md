@@ -50,9 +50,10 @@ startup:
 ./scripts/run_jetarm.sh --actuate
 ```
 
-The launcher stops Hiwonder's `start_app_node.service`, starts the base JetArm
-SDK driver, verifies exclusive ownership of the vendor servo command topic, and
-then starts `jetarm_control_node` plus the dashboard. Actuation starts in
+The launcher stops Hiwonder's `start_app_node.service`, starts only the
+low-level `ros_robot_controller` driver, verifies exclusive ownership of the
+vendor servo command topic, and then starts `jetarm_control_node` plus the
+dashboard. Actuation starts in
 `BOOT_LOCKED`; press **Resume** once the workspace is clear. Stop or scanner stop
 returns the controller to `PAUSED`, and clearing E-stop never resumes it.
 

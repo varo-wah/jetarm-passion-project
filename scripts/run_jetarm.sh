@@ -60,7 +60,7 @@ fi
 export JETARM_ENABLE_ACTUATION="$actuation_enabled"
 
 controller_pid=""
-sdk_pid=""
+driver_pid=""
 
 topic_endpoint_count() {
     local endpoint_label="$1"
@@ -73,17 +73,32 @@ print_servo_topic_owners() {
     ros2 topic info -v /ros_robot_controller/bus_servo/set_position 2>/dev/null || true
 }
 
+stop_process_group() {
+    local leader_pid="$1"
+    [[ -z "$leader_pid" ]] && return 0
+
+    # Managed processes are started with setsid, so the leader PID is also the
+    # process-group ID. Signal the group to avoid orphaning ROS child processes.
+    if kill -0 -- "-$leader_pid" 2>/dev/null; then
+        kill -TERM -- "-$leader_pid" 2>/dev/null || true
+        for _ in {1..20}; do
+            kill -0 -- "-$leader_pid" 2>/dev/null || break
+            sleep 0.1
+        done
+        if kill -0 -- "-$leader_pid" 2>/dev/null; then
+            kill -KILL -- "-$leader_pid" 2>/dev/null || true
+        fi
+    fi
+    wait "$leader_pid" 2>/dev/null || true
+}
+
 cleanup() {
     trap - EXIT TERM
     if [[ -n "$controller_pid" ]] && kill -0 "$controller_pid" 2>/dev/null; then
         python3 -c "from jetarm.control.client import JetArmControlClient; c = JetArmControlClient(); c.safe_shutdown(); c.close()" >/dev/null 2>&1 || true
-        kill -TERM "$controller_pid" 2>/dev/null || true
-        wait "$controller_pid" 2>/dev/null || true
     fi
-    if [[ -n "$sdk_pid" ]] && kill -0 "$sdk_pid" 2>/dev/null; then
-        kill -TERM "$sdk_pid" 2>/dev/null || true
-        wait "$sdk_pid" 2>/dev/null || true
-    fi
+    stop_process_group "$controller_pid"
+    stop_process_group "$driver_pid"
 }
 
 trap cleanup EXIT TERM
@@ -131,24 +146,26 @@ if [[ "$actuation_enabled" == "1" ]]; then
     # Keep driver and authority outside the terminal's foreground process group.
     # Ctrl+C must reach Uvicorn first so its safe-shutdown callback can still
     # contact both ROS processes before launcher cleanup terminates them.
-    setsid ros2 launch sdk jetarm_sdk.launch.py &
-    sdk_pid=$!
+    # The full SDK launch also starts servo_manager, which publishes to the
+    # same bus topic as our central authority. Start only the serial driver.
+    setsid ros2 run ros_robot_controller ros_robot_controller &
+    driver_pid=$!
 
-    sdk_ready=0
+    driver_ready=0
     for _ in {1..60}; do
-        if ! kill -0 "$sdk_pid" 2>/dev/null; then
-            echo "ERROR: JetArm SDK driver exited during startup." >&2
+        if ! kill -0 "$driver_pid" 2>/dev/null; then
+            echo "ERROR: JetArm low-level driver exited during startup." >&2
             exit 8
         fi
         if [[ "$(topic_endpoint_count "Subscription count")" -ge "1" ]]; then
-            sdk_ready=1
+            driver_ready=1
             break
         fi
         sleep 0.25
     done
 
-    if [[ "$sdk_ready" != "1" ]]; then
-        echo "ERROR: JetArm SDK did not subscribe to the servo-command topic." >&2
+    if [[ "$driver_ready" != "1" ]]; then
+        echo "ERROR: JetArm low-level driver did not subscribe to the servo-command topic." >&2
         exit 9
     fi
 
