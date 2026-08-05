@@ -1,5 +1,6 @@
 import unittest
 
+from jetarm.control.limits import JointLimitsError
 from jetarm.hardware import Class_Execution as hardware
 
 
@@ -52,6 +53,12 @@ class HardwareSafetyTests(unittest.TestCase):
         self.assertFalse(hardware.motion_is_allowed())
         self.assertTrue(hardware.resume_system())
         self.assertTrue(hardware.motion_is_allowed())
+
+    def test_preflight_rejects_calibrated_joint_limit_without_command(self):
+        with self.assertRaisesRegex(JointLimitsError, "elbow_joint"):
+            self.ik.plan_to(-2.28, 14.05, 7.0)
+
+        self.assertEqual(self.arm.commands, [])
 
 
 if __name__ == "__main__":

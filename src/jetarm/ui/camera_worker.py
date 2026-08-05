@@ -1,6 +1,7 @@
 # camera_worker.py
 # Owns the camera (single owner) and continuously updates the latest frame in memory.
 
+import os
 import threading
 import time
 from typing import Optional
@@ -17,6 +18,36 @@ latest_frame_lock = threading.Lock()
 _camera_thread: Optional[threading.Thread] = None
 _stop_event = threading.Event()
 _is_running_lock = threading.Lock()
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        print(f"[CAMERA] Invalid {name}; using {default}")
+        return default
+
+
+def _apply_camera_controls(cap) -> None:
+    """Apply repeatable low-light controls after OpenCV opens the V4L2 device."""
+
+    controls = (
+        ("brightness", cv2.CAP_PROP_BRIGHTNESS, "JETARM_CAMERA_BRIGHTNESS", 12),
+        ("gain", cv2.CAP_PROP_GAIN, "JETARM_CAMERA_GAIN", 20),
+        ("gamma", cv2.CAP_PROP_GAMMA, "JETARM_CAMERA_GAMMA", 140),
+        (
+            "backlight",
+            getattr(cv2, "CAP_PROP_BACKLIGHT", None),
+            "JETARM_CAMERA_BACKLIGHT",
+            2,
+        ),
+    )
+    for label, property_id, env_name, default in controls:
+        if property_id is None:
+            continue
+        value = _env_int(env_name, default)
+        if not cap.set(property_id, value):
+            print(f"[CAMERA] Driver ignored {label}={value}")
 
 
 def _camera_loop(
@@ -41,10 +72,11 @@ def _camera_loop(
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(height))
     if fps is not None:
         cap.set(cv2.CAP_PROP_FPS, int(fps))
+    _apply_camera_controls(cap)
 
     try:
         # Warm-up frames (helps exposure/auto-focus settle)
-        for _ in range(5):
+        for _ in range(_env_int("JETARM_CAMERA_WARMUP_FRAMES", 30)):
             if _stop_event.is_set():
                 break
             cap.read()

@@ -114,3 +114,24 @@ def validate_pulse_targets(
             raise JointLimitsError(f"Unknown servo ID: {servo_id}")
         validated[servo_id] = joint.validate_pulse(pulse)
     return validated
+
+
+def fastest_safe_duration(
+    starts: Mapping[int, float],
+    targets: Mapping[int, float],
+    limits: Mapping[int, JointLimits],
+    requested_duration: float,
+) -> float:
+    """Return the shortest duration that respects every calibrated velocity."""
+
+    if not math.isfinite(float(requested_duration)) or requested_duration <= 0:
+        raise JointLimitsError("Motion duration must be positive and finite")
+
+    duration = float(requested_duration)
+    for servo_id, target in validate_pulse_targets(targets, limits).items():
+        if servo_id not in starts:
+            continue
+        start = limits[servo_id].validate_pulse(starts[servo_id])
+        minimum = abs(target - start) / limits[servo_id].max_velocity_pulses_per_second
+        duration = max(duration, minimum)
+    return duration

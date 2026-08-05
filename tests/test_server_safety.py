@@ -152,12 +152,14 @@ class ServerSafetyTests(unittest.TestCase):
         server_app._scanner_autocycle_enabled = False
         server_app._status["state"] = "SCANNER_RUNNING"
 
-        server_app._scanner_autocycle_loop()
+        with patch.object(server_app, "stop_motion") as stop_motion:
+            server_app._scanner_autocycle_loop()
 
         self.assertEqual(server_app._status["state"], "SCANNER_ERROR")
         self.assertEqual(server_app._status["last_action"], "scanner_exited")
         self.assertEqual(server_app._status["last_error"], "YOLO scanner exited with code 7")
         self.assertIsNone(server_app._scanner_proc)
+        stop_motion.assert_called_once_with()
 
     def test_shutdown_stops_camera_after_workers(self):
         with patch.object(server_app, "_request_person_follow_stop") as stop_follow, patch.object(

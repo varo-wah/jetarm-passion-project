@@ -10,4 +10,11 @@
   the listed node/process; centralized authority requires exactly one publisher.
 - If startup reports `/dev/video0` is busy, stop the listed camera owner before
   retrying. The dashboard camera worker must be the device's only owner.
+- If the dashboard feed is dark, tune the `JETARM_CAMERA_BRIGHTNESS`,
+  `JETARM_CAMERA_GAIN`, `JETARM_CAMERA_GAMMA`, and
+  `JETARM_CAMERA_BACKLIGHT` environment variables. The ROS
+  `usb_cam_param.yaml` is not used by the dashboard's OpenCV capture path.
+- If scanner preflight rejects a target, do not expand joint limits. Reposition
+  the object or calibrate the bucket/arm geometry; no object has been gripped at
+  the time of a preflight rejection.
 - If pixel-to-robot conversion fails, verify the calibration files exist in `data/calibration/`.

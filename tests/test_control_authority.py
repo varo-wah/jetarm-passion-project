@@ -1,7 +1,12 @@
 import unittest
 
 from jetarm.control.authority import ControlState, MotionAuthority
-from jetarm.control.limits import JointLimitsError, load_joint_limits, validate_pulse_targets
+from jetarm.control.limits import (
+    JointLimitsError,
+    fastest_safe_duration,
+    load_joint_limits,
+    validate_pulse_targets,
+)
 
 
 class ControlAuthorityTests(unittest.TestCase):
@@ -22,6 +27,26 @@ class ControlAuthorityTests(unittest.TestCase):
             validate_pulse_targets({4: 701}, self.limits)
         with self.assertRaises(JointLimitsError):
             validate_pulse_targets({99: 500}, self.limits)
+
+    def test_motion_duration_extends_to_fastest_calibrated_value(self):
+        duration = fastest_safe_duration(
+            {1: 500, 2: 490},
+            {1: 8, 2: 424},
+            self.limits,
+            requested_duration=1.2,
+        )
+
+        self.assertAlmostEqual(duration, 1.23)
+
+    def test_motion_duration_preserves_slower_operator_request(self):
+        duration = fastest_safe_duration(
+            {1: 500},
+            {1: 8},
+            self.limits,
+            requested_duration=2.0,
+        )
+
+        self.assertEqual(duration, 2.0)
 
     def test_boot_is_locked_until_explicit_resume(self):
         snapshot = self.authority.snapshot()

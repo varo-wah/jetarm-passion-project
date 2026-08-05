@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
+from jetarm.control.limits import JointLimitsError
 from jetarm.sorting import yolo_vision_scanner as scanner
 
 
@@ -45,6 +46,37 @@ class ScannerSafetyTests(unittest.TestCase):
             scanner.main()
 
         scan_once.assert_called_once_with(move_to_scan_pose=False)
+
+    def test_preflight_rejects_target_before_any_motion(self):
+        target = {"x": -2.28, "y": 14.05, "angle": 0.0, "color": "NEUTRAL"}
+
+        with patch.object(
+            scanner.ik,
+            "plan_to",
+            side_effect=JointLimitsError("elbow_joint: outside calibrated range"),
+        ), patch.object(scanner.ik, "move_to") as move_to:
+            self.assertFalse(scanner.preflight_pick_and_drop(target))
+
+        move_to.assert_not_called()
+
+    def test_neutral_route_from_hardware_log_passes_preflight(self):
+        target = {
+            "x": 0.48,
+            "y": 20.50,
+            "angle": 138.1,
+            "color": "NEUTRAL",
+            "frame_shape": (480, 640, 3),
+        }
+
+        self.assertTrue(scanner.preflight_pick_and_drop(target))
+
+    def test_motion_exception_becomes_controlled_failure(self):
+        with patch.object(
+            scanner.ik,
+            "move_to",
+            side_effect=JointLimitsError("elbow_joint: outside calibrated range"),
+        ):
+            self.assertFalse(scanner.move_wait(1.0, 10.0, 7.0, "approach"))
 
 
 if __name__ == "__main__":

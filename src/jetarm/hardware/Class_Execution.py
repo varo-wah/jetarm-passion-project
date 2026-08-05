@@ -1,6 +1,7 @@
 import math
 import time
 
+from jetarm.control.limits import JointLimitsError, load_joint_limits, validate_pulse_targets
 from jetarm.hardware.classCreation import CKMJetArm
 from jetarm.hardware.safety_state import MOTION_SAFETY
 
@@ -80,6 +81,7 @@ class JetArmIK:
 
         self.ELBOW_UP = True
         self.last_base_angle = 0.0
+        self._limits = load_joint_limits()
 
         # --- Your calibration (OPEN gripper, fixed wrist angle) ---
         # (0,15,20)->11 and (0,15,15)->7  => slope 0.8, bias -4.5
@@ -121,7 +123,7 @@ class JetArmIK:
         b = self.Z_TIP_BIAS_CM
         return (z_table_cm - b + sag) / a
 
-    def calculate_angles(self, x, y, z_wrist):
+    def calculate_angles(self, x, y, z_wrist, *, update_continuity=True):
         # 1) Base angle
         base_angle = math.degrees(math.atan2(y, x))
 
@@ -131,7 +133,8 @@ class JetArmIK:
             base_angle += 360.0
         elif base_angle - prev > 180.0:
             base_angle -= 360.0
-        self.last_base_angle = base_angle
+        if update_continuity:
+            self.last_base_angle = base_angle
 
         # 3) Planar IK (your method, with a safe reach guard)
         l = math.hypot(x, y)
@@ -160,27 +163,40 @@ class JetArmIK:
 
         return base_angle, L1_angle, L2_angle, L3_angle
 
-    def _apply_pulses(self, base_angle, L1_angle, L2_angle, L3_angle, x, y, z_wrist):
-        base_pulse = self.base_to_pulse(base_angle)
-        L1_pulse = self.arm_to_pulse(L1_angle)
-        L2_pulse = self.arm_to_pulse(L2_angle)
-        L3_pulse = self.arm_to_pulse(L3_angle) + 35
-
-        pulses = {"base": base_pulse, "L1": L1_pulse, "L2": L2_pulse, "L3": L3_pulse}
-
-        for name, p in pulses.items():
-            if p < 0 or p > 1000:
-                print(f"❌ Joint limit: {name} pulse={p} (x={x:.1f}, y={y:.1f}, z_wrist={z_wrist:.1f})")
-                return False
-
-        print(f"Smooth moving to: {pulses['base']}, {pulses['L1']}, {pulses['L2']}, {pulses['L3']}")
-        return self.Arm.smoothMoveJetArmGroup(
+    def _pulse_targets(self, base_angle, L1_angle, L2_angle, L3_angle):
+        return validate_pulse_targets(
             {
-                1: pulses["base"],
-                2: pulses["L1"],
-                3: pulses["L2"],
-                4: pulses["L3"],
+                1: self.base_to_pulse(base_angle),
+                2: self.arm_to_pulse(L1_angle),
+                3: self.arm_to_pulse(L2_angle),
+                4: self.arm_to_pulse(L3_angle) + 35,
             },
+            self._limits,
+        )
+
+    def plan_to_wrist(self, x, y, z_wrist):
+        angles = self.calculate_angles(x, y, z_wrist, update_continuity=False)
+        return self._pulse_targets(*angles)
+
+    def plan_to(self, x, y, z_table):
+        return self.plan_to_wrist(x, y, self._z_table_to_wrist(x, y, z_table))
+
+    def _apply_pulses(self, base_angle, L1_angle, L2_angle, L3_angle, x, y, z_wrist):
+        try:
+            targets = self._pulse_targets(base_angle, L1_angle, L2_angle, L3_angle)
+        except JointLimitsError as error:
+            print(
+                f"❌ Calibrated joint limit rejected x={x:.1f}, y={y:.1f}, "
+                f"z_wrist={z_wrist:.1f} ({error})"
+            )
+            return False
+
+        print(
+            f"Smooth moving to: {targets[1]}, {targets[2]}, "
+            f"{targets[3]}, {targets[4]}"
+        )
+        return self.Arm.smoothMoveJetArmGroup(
+            targets,
             duration=1.2,
             steps=24,
         )
@@ -220,14 +236,32 @@ class JetArmGripper:
     def wrist_to_pulse(self, angle_deg):
         return int(round(angle_deg / self.DEG_PER_PULSE + self.BASE_ZERO_OFFSET))
 
+    def plan_wrist(self, angle, *, base_angle=None):
+        if base_angle is None:
+            base_angle = self.ik.last_base_angle
+        final_angle = (angle - 90.0) + base_angle
+        return validate_pulse_targets(
+            {5: self.wrist_to_pulse(final_angle)},
+            self.ik._limits,
+        )
+
+    def plan_gripper(self):
+        open_target = validate_pulse_targets(
+            {10: self.openGripperPulse},
+            self.ik._limits,
+        )[10]
+        close_target = validate_pulse_targets(
+            {10: self.closeGripperPulse},
+            self.ik._limits,
+        )[10]
+        return {"open": open_target, "close": close_target}
+
     def turn_wrist(self, angle):
         if not motion_is_allowed():
             print("🛑 Motion safety latch blocked wrist movement")
             return False
 
-        base_angle = self.ik.last_base_angle
-        final_angle = (angle - 90.0) + base_angle
-        wrist_pulse = self.wrist_to_pulse(final_angle)
+        wrist_pulse = self.plan_wrist(angle)[5]
         return self.Arm.moveJetArm(5, wrist_pulse)
 
     def close_gripper(self):

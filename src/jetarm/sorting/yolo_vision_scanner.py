@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 import requests
 
+from jetarm.control.limits import JointLimitsError
 from jetarm.hardware.Class_Execution import camera, gripper, ik
 from jetarm.vision.yolo_detector import detect_bricks_yolo
 from jetarm.vision.wrist_safety import choose_safe_wrist_angle
@@ -120,11 +121,48 @@ def bucket_for_color(color):
 
 def move_wait(x, y, z, label):
     stage(label, f"Target: x={x:.2f}, y={y:.2f}, z={z:.2f}")
-    ok = ik.move_to(x, y, z)
+    try:
+        ok = ik.move_to(x, y, z)
+    except (JointLimitsError, RuntimeError, ValueError) as error:
+        print(f"[YOLO SCANNER] Motion rejected: {error}")
+        return False
     time.sleep(MOVE_TIME + SETTLE_TIME)
     if not ok:
         print("[YOLO SCANNER] Skipping: unreachable or joint limit")
     return ok
+
+
+def preflight_pick_and_drop(brick):
+    """Validate the complete route before the gripper can acquire an object."""
+
+    x = brick["x"]
+    y = brick["y"]
+    bx, by = bucket_for_color(brick.get("color"))
+    route = (
+        (x, y, APPROACH_Z, "target approach"),
+        (x, y, PICK_Z, "target pickup"),
+        (0, 13, 14, "transfer waypoint"),
+        (bx, by, APPROACH_BUCKET, f"{brick.get('color', 'NEUTRAL')} bucket"),
+    )
+    approach_targets = None
+    for route_x, route_y, route_z, label in route:
+        try:
+            targets = ik.plan_to(route_x, route_y, route_z)
+            if label == "target approach":
+                approach_targets = targets
+        except (JointLimitsError, RuntimeError, ValueError) as error:
+            print(f"[YOLO SCANNER] Preflight rejected {label}: {error}")
+            return False
+
+    try:
+        angle, _ = choose_safe_wrist_angle(brick, brick.get("frame_shape"))
+        base_angle = (approach_targets[1] - ik.BASE_ZERO_OFFSET) * ik.DEG_PER_PULSE
+        gripper.plan_wrist(angle, base_angle=base_angle)
+        gripper.plan_gripper()
+    except (JointLimitsError, RuntimeError, ValueError) as error:
+        print(f"[YOLO SCANNER] Preflight rejected gripper route: {error}")
+        return False
+    return True
 
 
 def scan_once(move_to_scan_pose=None):
@@ -152,10 +190,10 @@ def scan_once(move_to_scan_pose=None):
 
 
 def choose_brick(bricks):
-    if not bricks:
-        return None
-
-    return bricks[0]
+    for brick in bricks:
+        if not ENABLE_PICK_AND_DROP or preflight_pick_and_drop(brick):
+            return brick
+    return None
 
 
 def print_selected_target(brick):
@@ -191,37 +229,31 @@ def pick_and_drop(brick):
         "[YOLO SCANNER] Aligning wrist: "
         f"detected={detected_angle:.1f} final={angle:.1f} edge={edge_status}"
     )
-    gripper.turn_wrist(angle)
+    if not gripper.turn_wrist(angle):
+        return False
     time.sleep(WRIST_SETTLE)
 
     if not move_wait(x, y, PICK_Z, "[YOLO SCANNER] Going down"):
         return False
 
     print("[YOLO SCANNER] Closing gripper")
-    gripper.close_gripper()
+    if not gripper.close_gripper():
+        return False
     time.sleep(GRIP_SETTLE)
 
     if not move_wait(x, y, APPROACH_Z, "[YOLO SCANNER] Lifting up"):
-        print("[YOLO SCANNER] Lift failed after grip; opening gripper for safety")
-        gripper.open_gripper()
-        time.sleep(RELEASE_SETTLE)
         return False
 
-    ik.move_to(0, 13, 14)
-    time.sleep(GRIP_SETTLE)
+    if not move_wait(0, 13, 14, "[YOLO SCANNER] Transfer waypoint"):
+        return False
 
     if not move_wait(bx, by, APPROACH_BUCKET, f"[YOLO SCANNER] To {brick.get('color', 'NEUTRAL')} bucket"):
-        print("[YOLO SCANNER] Bucket approach unreachable; opening gripper for safety")
-        gripper.open_gripper()
-        time.sleep(RELEASE_SETTLE)
         return False
 
     print("[YOLO SCANNER] Opening gripper")
-    gripper.open_gripper()
+    if not gripper.open_gripper():
+        return False
     time.sleep(RELEASE_SETTLE)
-
-    ik.move_to(bx, by, APPROACH_BUCKET)
-    time.sleep(MOVE_TIME + SETTLE_TIME)
 
     return True
 
@@ -245,7 +277,13 @@ def main():
         print_selected_target(target)
 
         if target is None:
-            stage("[YOLO SCANNER] Done", "No YOLO bricks detected")
+            if bricks:
+                stage(
+                    "[YOLO SCANNER] Done",
+                    "Detections found, but none has a complete calibrated route",
+                )
+            else:
+                stage("[YOLO SCANNER] Done", "No YOLO bricks detected")
             break
 
         print("[YOLO SCANNER] Executing pick/drop")
@@ -255,7 +293,9 @@ def main():
             picked += 1
             print(f"[YOLO SCANNER] Picked count: {picked}")
         else:
-            print("[YOLO SCANNER] No pick this cycle; rescanning next")
+            raise RuntimeError(
+                "Pick/drop motion failed; scanner stopped without autonomous recovery"
+            )
 
     stage("[YOLO SCANNER] Finished", f"Total picked: {picked}")
 

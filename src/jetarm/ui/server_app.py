@@ -296,6 +296,7 @@ def _scanner_autocycle_loop() -> None:
         if exit_code != 0:
             with _scanner_lock:
                 _scanner_autocycle_enabled = False
+            stop_motion()
             _status["state"] = "SCANNER_ERROR"
             _status["last_action"] = "scanner_exited"
             _status["last_error"] = f"YOLO scanner exited with code {exit_code}"

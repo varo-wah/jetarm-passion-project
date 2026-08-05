@@ -19,7 +19,12 @@ from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 from jetarm.control.authority import ControlState, MotionAuthority
-from jetarm.control.limits import JointLimitsError, limits_by_name, load_joint_limits
+from jetarm.control.limits import (
+    JointLimitsError,
+    fastest_safe_duration,
+    limits_by_name,
+    load_joint_limits,
+)
 
 
 ACTION_NAME = "/jetarm_controller/follow_joint_trajectory"
@@ -279,14 +284,13 @@ class JetArmControlNode(Node):
             )
 
         starts = {servo_id: self._last_positions[servo_id] for servo_id in targets}
-        for servo_id, target in targets.items():
-            velocity = abs(target - starts[servo_id]) / duration
-            maximum = self._limits[servo_id].max_velocity_pulses_per_second
-            if velocity > maximum:
-                raise JointLimitsError(
-                    f"{self._limits[servo_id].name}: requested velocity "
-                    f"{velocity:.1f} exceeds calibrated maximum {maximum:.1f} pulses/s"
-                )
+        safe_duration = fastest_safe_duration(starts, targets, self._limits, duration)
+        if safe_duration > duration:
+            self.get_logger().info(
+                f"Extended trajectory from {duration:.2f}s to {safe_duration:.2f}s "
+                "to remain at the calibrated velocity limit"
+            )
+            duration = safe_duration
         steps = max(1, int(math.ceil(duration / FRAME_PERIOD_SECONDS)))
         frame_duration = duration / steps
 
