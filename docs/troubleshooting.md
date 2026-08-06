@@ -10,16 +10,13 @@
   the listed node/process; centralized authority requires exactly one publisher.
 - If startup reports `/dev/video0` is busy, stop the listed camera owner before
   retrying. The dashboard camera worker must be the device's only owner.
-- The camera uses its driver defaults unless a `JETARM_CAMERA_*` override is
-  explicitly provided. Keep the defaults for a natural image. If the raw feed
-  is genuinely underexposed, tune `JETARM_CAMERA_BRIGHTNESS`,
-  `JETARM_CAMERA_GAIN`, `JETARM_CAMERA_GAMMA`, or
-  `JETARM_CAMERA_BACKLIGHT` individually in preview mode. The ROS
-  `usb_cam_param.yaml` is not used by the dashboard's OpenCV capture path.
-- Raw is always unmodified. OpenCV and YOLO display processing also defaults to
-  natural output (`JETARM_DISPLAY_GAMMA=1.00` and
-  `JETARM_DISPLAY_SATURATION=1.00`). Set display gamma below `1.00` only when a
-  non-detection preview needs a modest shadow lift.
+- On every camera start, the dashboard restores supported image controls to the
+  V4L2 driver's defaults before OpenCV opens `/dev/video0`. Raw, OpenCV, and
+  YOLO views do not apply gamma, saturation, or color enhancement. If the
+  startup log says `v4l2-ctl` is unavailable or the natural feed remains
+  tinted, capture `v4l2-ctl -d /dev/video0 --all` and inspect lighting or the
+  camera driver rather than adding display filters. The ROS
+  `usb_cam_param.yaml` is not used by this OpenCV capture path.
 - If scanner preflight rejects a target, do not expand joint limits. Reposition
   the object or calibrate the bucket/arm geometry; no object has been gripped at
   the time of a preflight rejection.

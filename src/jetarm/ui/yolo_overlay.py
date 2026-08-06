@@ -4,7 +4,7 @@ import time
 import cv2
 
 from jetarm.config.detection_roi import ROI_DRAW_BOX, roi_bounds_from_shape
-from jetarm.ui.display_appearance import enhance_display_frame
+from jetarm.ui.display_appearance import natural_display_frame
 from jetarm.vision.yolo_detector import choose_target, detect_objects
 
 YOLO_MAX_FPS = 5.0
@@ -185,7 +185,7 @@ def annotate_yolo_frame(frame):
         source = frame.copy()
         detections = detect_objects(source)
         target = choose_target(detections)
-        display_frame = enhance_display_frame(source)
+        display_frame = natural_display_frame(source)
         annotated_frame = draw_detections(display_frame, detections, target)
         _set_cached_frame(annotated_frame, time.monotonic())
         return annotated_frame

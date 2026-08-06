@@ -21,7 +21,7 @@
 - Safe shutdown cancels work and uses the safe pose only from a known commanded
   state. E-stop clear always remains paused.
 
-Local software validation on 2026-08-06: 72 tests passed. This is not physical
+Local software validation on 2026-08-06: 75 tests passed. This is not physical
 certification.
 
 ## Required JetArm validation

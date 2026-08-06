@@ -2,6 +2,9 @@
 # Owns the camera (single owner) and continuously updates the latest frame in memory.
 
 import os
+import re
+import shutil
+import subprocess
 import threading
 import time
 from typing import Optional
@@ -20,6 +23,40 @@ _stop_event = threading.Event()
 _is_running_lock = threading.Lock()
 
 
+_V4L2_DEFAULT_RE = re.compile(
+    r"^\s*([a-zA-Z0-9_]+).*?\bdefault=(-?\d+)\b"
+)
+
+# Reset only image-appearance controls. Avoid unrelated controls such as PTZ,
+# privacy, LEDs, or codec settings.
+_V4L2_IMAGE_CONTROL_ORDER = (
+    "auto_exposure",
+    "exposure_auto",
+    "exposure_auto_priority",
+    "exposure_dynamic_framerate",
+    "white_balance_automatic",
+    "auto_white_balance",
+    "white_balance_temperature_auto",
+    "focus_automatic_continuous",
+    "focus_auto",
+    "brightness",
+    "contrast",
+    "saturation",
+    "hue",
+    "red_balance",
+    "blue_balance",
+    "white_balance_temperature",
+    "gamma",
+    "gain",
+    "power_line_frequency",
+    "sharpness",
+    "backlight_compensation",
+    "exposure_time_absolute",
+    "exposure_absolute",
+    "focus_absolute",
+)
+
+
 def _env_int(name: str, default: Optional[int] = None) -> Optional[int]:
     raw_value = os.environ.get(name)
     if raw_value is None:
@@ -31,27 +68,56 @@ def _env_int(name: str, default: Optional[int] = None) -> Optional[int]:
         return default
 
 
-def _apply_camera_controls(cap) -> None:
-    """Apply only explicit overrides, preserving natural driver defaults."""
+def _parse_v4l2_defaults(output: str) -> dict[str, int]:
+    defaults = {}
+    for line in output.splitlines():
+        match = _V4L2_DEFAULT_RE.match(line)
+        if match is not None:
+            defaults[match.group(1)] = int(match.group(2))
+    return defaults
 
-    controls = (
-        ("brightness", cv2.CAP_PROP_BRIGHTNESS, "JETARM_CAMERA_BRIGHTNESS"),
-        ("gain", cv2.CAP_PROP_GAIN, "JETARM_CAMERA_GAIN"),
-        ("gamma", cv2.CAP_PROP_GAMMA, "JETARM_CAMERA_GAMMA"),
-        (
-            "backlight",
-            getattr(cv2, "CAP_PROP_BACKLIGHT", None),
-            "JETARM_CAMERA_BACKLIGHT",
-        ),
+
+def _reset_camera_controls(cam_index: int) -> int:
+    """Restore supported image controls to the V4L2 driver's defaults."""
+
+    v4l2_ctl = shutil.which("v4l2-ctl")
+    if v4l2_ctl is None:
+        print("[CAMERA] v4l2-ctl unavailable; camera defaults were not reset")
+        return 0
+
+    device = f"/dev/video{cam_index}"
+    listed = subprocess.run(
+        [v4l2_ctl, "--device", device, "--list-ctrls"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    for label, property_id, env_name in controls:
-        if property_id is None:
+    if listed.returncode != 0:
+        detail = listed.stderr.strip() or "unknown V4L2 error"
+        print(f"[CAMERA] Could not read driver defaults for {device}: {detail}")
+        return 0
+
+    defaults = _parse_v4l2_defaults(listed.stdout)
+    restored = 0
+    for control_name in _V4L2_IMAGE_CONTROL_ORDER:
+        if control_name not in defaults:
             continue
-        value = _env_int(env_name)
-        if value is None:
-            continue
-        if not cap.set(property_id, value):
-            print(f"[CAMERA] Driver ignored {label}={value}")
+        result = subprocess.run(
+            [
+                v4l2_ctl,
+                "--device",
+                device,
+                f"--set-ctrl={control_name}={defaults[control_name]}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            restored += 1
+
+    print(f"[CAMERA] Restored {restored} image controls to driver defaults")
+    return restored
 
 
 def _camera_loop(
@@ -64,6 +130,11 @@ def _camera_loop(
     Background thread function.
     Opens the camera once and continually updates latest_frame.
     """
+    # Reset persistent V4L2 image controls before OpenCV owns the device. This
+    # prevents an earlier process from leaving brightness, gain, gamma, or
+    # white-balance tuning active in a supposedly natural feed.
+    _reset_camera_controls(cam_index)
+
     cap = cv2.VideoCapture(cam_index)
     if not cap.isOpened():
         raise RuntimeError(f"Could not open camera at index {cam_index}")
@@ -76,7 +147,6 @@ def _camera_loop(
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(height))
     if fps is not None:
         cap.set(cv2.CAP_PROP_FPS, int(fps))
-    _apply_camera_controls(cap)
 
     try:
         # Warm-up frames (helps exposure/auto-focus settle)

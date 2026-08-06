@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 from jetarm.config.detection_roi import point_in_roi, roi_bounds_from_shape
-from jetarm.ui.display_appearance import enhance_display_frame
+from jetarm.ui.display_appearance import natural_display_frame
 from jetarm.vision import coordinatelogic
 from jetarm.vision.wrist_safety import choose_safe_wrist_angle
 from jetarm.vision.yolo_detector import choose_target, to_vision_scanner_format
@@ -40,25 +40,19 @@ class GeometryAndVisionTests(unittest.TestCase):
         frame = np.full((20, 20, 3), (70, 55, 45), dtype=np.uint8)
         original = frame.copy()
 
-        enhanced = enhance_display_frame(frame)
+        enhanced = natural_display_frame(frame)
 
         np.testing.assert_array_equal(frame, original)
         np.testing.assert_array_equal(enhanced, original)
 
-    def test_optional_display_gamma_brightens_without_modifying_source(self):
+    def test_display_output_never_applies_gamma_or_saturation(self):
         frame = np.full((20, 20, 3), (70, 55, 45), dtype=np.uint8)
         original = frame.copy()
 
-        with patch("jetarm.ui.display_appearance.SHADOW_GAMMA", 0.90):
-            enhanced = enhance_display_frame(frame)
-        source_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        enhanced_hsv = cv2.cvtColor(enhanced, cv2.COLOR_BGR2HSV)
+        enhanced = natural_display_frame(frame)
 
         np.testing.assert_array_equal(frame, original)
-        self.assertGreater(
-            float(enhanced_hsv[:, :, 2].mean()),
-            float(source_hsv[:, :, 2].mean()),
-        )
+        np.testing.assert_array_equal(enhanced, original)
 
     def test_roi_bounds_and_membership_for_runtime_frame(self):
         shape = (480, 640, 3)
