@@ -213,7 +213,8 @@ if [[ "$actuation_enabled" == "1" ]]; then
 else
     echo "JetArm dashboard starting in PREVIEW mode"
 fi
-echo "Open http://0.0.0.0:8000"
+echo "Open http://localhost:8000 on the JetArm."
+echo "From another device, open http://<JETARM_IP>:8000 on the same network."
 
 if [[ "$actuation_enabled" == "1" ]]; then
     echo "Motion authority starts PAUSED; use Resume before commanding the arm."

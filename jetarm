@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+usage() {
+    cat <<'EOF'
+Usage:
+  ./jetarm website              Start the dashboard in safe preview mode
+  ./jetarm website --actuate    Start the dashboard for supervised actuation
+  ./jetarm help                 Show this help
+
+Open http://localhost:8000 on the JetArm, or http://<JETARM_IP>:8000 from
+another device on the same network.
+EOF
+}
+
+command="${1:-help}"
+
+case "$command" in
+    website|dashboard)
+        shift
+        mode="${1:---preview}"
+        if [[ "$#" -gt 1 ]]; then
+            echo "ERROR: Too many arguments." >&2
+            usage >&2
+            exit 2
+        fi
+
+        case "$mode" in
+            --preview|preview)
+                launch_mode="--preview"
+                ;;
+            --actuate|actuate)
+                launch_mode="--actuate"
+                ;;
+            *)
+                echo "ERROR: Unknown website mode: $mode" >&2
+                usage >&2
+                exit 2
+                ;;
+        esac
+
+        exec "$project_root/scripts/run_jetarm.sh" "$launch_mode"
+        ;;
+    help|-h|--help)
+        usage
+        ;;
+    *)
+        echo "ERROR: Unknown command: $command" >&2
+        usage >&2
+        exit 2
+        ;;
+esac

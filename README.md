@@ -29,11 +29,14 @@ Install Python dependencies:
 python3 -m pip install -r requirements.txt
 ```
 
-Run the FastAPI dashboard in the default non-actuating preview mode:
+Start the website in the default non-actuating preview mode:
 
 ```bash
-./scripts/run_jetarm.sh --preview
+./jetarm website
 ```
+
+Then open `http://localhost:8000` on the JetArm. From another computer on the
+same network, open `http://<JETARM_IP>:8000`.
 
 Run one YOLO preview scan directly without moving the robot:
 
@@ -47,10 +50,11 @@ Robot motion and scanner auto-cycle require an explicit opt-in before server
 startup:
 
 ```bash
-./scripts/run_jetarm.sh --actuate
+./jetarm website --actuate
 ```
 
-The launcher stops Hiwonder's `start_app_node.service`, starts only the
+Both commands delegate to the same safety-aware launcher. The actuation path
+stops Hiwonder's `start_app_node.service`, starts only the
 low-level `ros_robot_controller` driver, verifies exclusive ownership of the
 vendor servo command topic, and then starts `jetarm_control_node` plus the
 dashboard. Actuation starts in

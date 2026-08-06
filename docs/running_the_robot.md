@@ -1,10 +1,15 @@
 # Running The Robot
 
-Run the FastAPI dashboard in non-actuating preview mode:
+From the repository root on the JetArm, start the website in non-actuating
+preview mode:
 
 ```bash
-./scripts/run_jetarm.sh --preview
+./jetarm website
 ```
+
+Open `http://localhost:8000` in a browser on the JetArm. From another device on
+the same network, open `http://<JETARM_IP>:8000`, replacing `<JETARM_IP>` with
+the JetArm's address.
 
 Run one YOLO preview scan without moving the robot:
 
@@ -17,7 +22,7 @@ python3 -m jetarm.sorting.yolo_vision_scanner
 Enable robot motion only during supervised, staged hardware validation:
 
 ```bash
-./scripts/run_jetarm.sh --actuate
+./jetarm website --actuate
 ```
 
 The launcher preserves the JetArm ROS environment and checks `rclpy` plus
