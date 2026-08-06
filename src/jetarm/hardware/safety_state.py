@@ -26,7 +26,7 @@ class MotionSafetyState:
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        self._paused = False
+        self._paused = True
         self._estop_latched = False
 
     def snapshot(self) -> SafetySnapshot:
@@ -60,6 +60,8 @@ class MotionSafetyState:
     def clear_estop(self) -> bool:
         """Clear only the E-stop latch; an explicit resume is still required."""
         with self._lock:
+            if not self._estop_latched:
+                return False
             self._estop_latched = False
         return True
 

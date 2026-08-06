@@ -1,15 +1,65 @@
 import unittest
 from unittest.mock import patch
 
+import cv2
 import numpy as np
 
 from jetarm.config.detection_roi import point_in_roi, roi_bounds_from_shape
+from jetarm.ui.display_appearance import enhance_display_frame
 from jetarm.vision import coordinatelogic
 from jetarm.vision.wrist_safety import choose_safe_wrist_angle
 from jetarm.vision.yolo_detector import choose_target, to_vision_scanner_format
 
 
 class GeometryAndVisionTests(unittest.TestCase):
+    def test_green_center_outvotes_blue_tinted_box_background(self):
+        frame = np.full((80, 80, 3), (85, 60, 50), dtype=np.uint8)
+        cv2.rectangle(frame, (24, 20), (56, 60), (30, 180, 30), -1)
+
+        self.assertEqual(coordinatelogic.detect_color(frame, 0, 0, 80, 80), "GREEN")
+
+    def test_neutral_center_is_not_stolen_by_blue_tinted_background(self):
+        frame = np.full((80, 80, 3), (85, 60, 50), dtype=np.uint8)
+        cv2.rectangle(frame, (18, 16), (62, 64), (145, 145, 145), -1)
+
+        self.assertEqual(coordinatelogic.detect_color(frame, 0, 0, 80, 80), "NEUTRAL")
+
+    def test_primary_lego_colors_are_classified(self):
+        colors = {
+            "RED": (25, 25, 190),
+            "GREEN": (25, 175, 30),
+            "BLUE": (190, 55, 30),
+        }
+
+        for expected, bgr in colors.items():
+            with self.subTest(color=expected):
+                frame = np.full((40, 40, 3), bgr, dtype=np.uint8)
+                self.assertEqual(coordinatelogic.detect_color(frame, 0, 0, 40, 40), expected)
+
+    def test_natural_display_defaults_do_not_modify_pixels(self):
+        frame = np.full((20, 20, 3), (70, 55, 45), dtype=np.uint8)
+        original = frame.copy()
+
+        enhanced = enhance_display_frame(frame)
+
+        np.testing.assert_array_equal(frame, original)
+        np.testing.assert_array_equal(enhanced, original)
+
+    def test_optional_display_gamma_brightens_without_modifying_source(self):
+        frame = np.full((20, 20, 3), (70, 55, 45), dtype=np.uint8)
+        original = frame.copy()
+
+        with patch("jetarm.ui.display_appearance.SHADOW_GAMMA", 0.90):
+            enhanced = enhance_display_frame(frame)
+        source_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        enhanced_hsv = cv2.cvtColor(enhanced, cv2.COLOR_BGR2HSV)
+
+        np.testing.assert_array_equal(frame, original)
+        self.assertGreater(
+            float(enhanced_hsv[:, :, 2].mean()),
+            float(source_hsv[:, :, 2].mean()),
+        )
+
     def test_roi_bounds_and_membership_for_runtime_frame(self):
         shape = (480, 640, 3)
 

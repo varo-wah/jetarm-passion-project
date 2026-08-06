@@ -30,6 +30,9 @@ class DashboardAlertContractTests(unittest.TestCase):
         self.assertIn('id="alertHistory"', DASHBOARD)
         self.assertIn('history.slice(0, 5)', DASHBOARD)
 
+    def test_header_uses_motion_authority_state(self):
+        self.assertIn('s.motion_safety?.state ?? s.state ?? "UNKNOWN"', DASHBOARD)
+
 
 if __name__ == "__main__":
     unittest.main()

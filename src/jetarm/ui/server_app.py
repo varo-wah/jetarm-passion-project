@@ -539,6 +539,22 @@ def _motion_conflict_response() -> JSONResponse | None:
     return JSONResponse({"ok": False, "error": error}, status_code=409)
 
 
+def _safety_command_failure(operation: str) -> JSONResponse:
+    safety = motion_safety_status()
+    state = safety.get("state", "UNKNOWN")
+    error = f"{operation} failed; controller state is {state}"
+    _status["last_error"] = error
+    _record_server_alert(
+        severity="fault",
+        code=f"{operation.upper().replace(' ', '_').replace('-', '_')}_FAILED",
+        stage="operator_command",
+        summary=f"{operation} was not acknowledged by the controller",
+        detail=error,
+        action="Keep the robot supervised and inspect the ROS controller before retrying.",
+    )
+    return JSONResponse({"ok": False, "error": error}, status_code=503)
+
+
 def _person_follow_loop() -> None:
     global _person_follow_x_cm
 
@@ -825,16 +841,20 @@ def api_cmd(cmd: dict = Body(...)):
         if ctype == "stop":
             _request_person_follow_stop()
             _request_scanner_autocycle_stop()
-            stop_motion()
+            ok = stop_motion()
             _stop_scanner_process()
+            if not ok:
+                return _safety_command_failure("Stop")
             _status["state"] = "STOPPED"
             return JSONResponse({"ok": True})
 
         if ctype == "estop":
-            estop_motion()
+            ok = estop_motion()
             _request_person_follow_stop()
             _request_scanner_autocycle_stop()
             _stop_scanner_process()
+            if not ok:
+                return _safety_command_failure("E-Stop")
             _status["state"] = "ESTOP"
             _record_server_alert(
                 severity="estop",
@@ -847,10 +867,12 @@ def api_cmd(cmd: dict = Body(...)):
             return JSONResponse({"ok": True})
 
         if ctype == "pause":
-            pause_system()
+            ok = pause_system()
             _request_person_follow_stop()
             _request_scanner_autocycle_stop()
             _stop_scanner_process()
+            if not ok:
+                return _safety_command_failure("Pause")
             _status["state"] = "PAUSED"
             return JSONResponse({"ok": True})
 
@@ -866,8 +888,9 @@ def api_cmd(cmd: dict = Body(...)):
             _request_person_follow_stop()
             _request_scanner_autocycle_stop()
             _stop_scanner_process()
-            clear_estop()
-            pause_system()
+            ok = clear_estop()
+            if not ok:
+                return _safety_command_failure("Clear E-Stop")
             _status["state"] = "PAUSED"
             _status["last_error"] = "--"
             return JSONResponse({

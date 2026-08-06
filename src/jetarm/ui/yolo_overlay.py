@@ -4,6 +4,7 @@ import time
 import cv2
 
 from jetarm.config.detection_roi import ROI_DRAW_BOX, roi_bounds_from_shape
+from jetarm.ui.display_appearance import enhance_display_frame
 from jetarm.vision.yolo_detector import choose_target, detect_objects
 
 YOLO_MAX_FPS = 5.0
@@ -13,6 +14,13 @@ _inference_lock = threading.Lock()
 _cache_lock = threading.Lock()
 _last_yolo_time = 0.0
 _last_annotated_frame = None
+
+DETECTION_COLORS = {
+    "RED": (40, 40, 255),
+    "GREEN": (40, 230, 40),
+    "BLUE": (255, 150, 40),
+    "NEUTRAL": (230, 230, 230),
+}
 
 
 def draw_detection(frame, detection, is_target):
@@ -28,14 +36,25 @@ def draw_detection(frame, detection, is_target):
     confidence = detection["confidence"]
     color = detection.get("color", "NEUTRAL")
 
-    box_color = (0, 0, 255) if is_target else (0, 255, 0)
-    text_color = (0, 0, 255) if is_target else (0, 255, 255)
+    semantic_color = DETECTION_COLORS.get(
+        str(color).upper(),
+        DETECTION_COLORS["NEUTRAL"],
+    )
+    box_color = semantic_color
+    text_color = semantic_color
 
     cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
-    cv2.circle(frame, (center_x, center_y), 5, (0, 255, 255), -1)
+    cv2.circle(frame, (center_x, center_y), 5, semantic_color, -1)
 
     if is_target:
-        cv2.circle(frame, (center_x, center_y), 14, (0, 0, 255), 2)
+        cv2.rectangle(
+            frame,
+            (x1 - 3, y1 - 3),
+            (x2 + 3, y2 + 3),
+            (255, 255, 255),
+            2,
+        )
+        cv2.circle(frame, (center_x, center_y), 14, (255, 255, 255), 2)
 
     text_x = x1
     text_y = max(20, y1 - 54)
@@ -73,7 +92,15 @@ def draw_detections(frame, detections, target):
             f"color={target.get('color', 'NEUTRAL')}"
         )
 
-    cv2.putText(frame, status, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
+    status_color = (
+        DETECTION_COLORS.get(
+            str(target.get("color", "NEUTRAL")).upper(),
+            DETECTION_COLORS["NEUTRAL"],
+        )
+        if target is not None
+        else DETECTION_COLORS["NEUTRAL"]
+    )
+    cv2.putText(frame, status, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, status_color, 2)
 
     if ROI_DRAW_BOX:
         x0, y0, x1, y1 = roi_bounds_from_shape(frame.shape)
@@ -158,7 +185,8 @@ def annotate_yolo_frame(frame):
         source = frame.copy()
         detections = detect_objects(source)
         target = choose_target(detections)
-        annotated_frame = draw_detections(source, detections, target)
+        display_frame = enhance_display_frame(source)
+        annotated_frame = draw_detections(display_frame, detections, target)
         _set_cached_frame(annotated_frame, time.monotonic())
         return annotated_frame
     finally:

@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+from jetarm.ui.display_appearance import enhance_display_frame
 from jetarm.vision.coordinatelogic import detect_color, pixel_to_robot
 
 MIN_AREA = 400
@@ -17,7 +18,7 @@ def annotate_frame(frame):
 
     # Use a clean source for detection, draw on a separate output
     src = frame
-    out = frame.copy()
+    out = enhance_display_frame(frame)
 
     # OpenCV feed intentionally scans the full frame for exhibition comparison.
     work = src

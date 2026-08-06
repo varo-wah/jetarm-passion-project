@@ -20,32 +20,36 @@ _stop_event = threading.Event()
 _is_running_lock = threading.Lock()
 
 
-def _env_int(name: str, default: int) -> int:
+def _env_int(name: str, default: Optional[int] = None) -> Optional[int]:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
     try:
-        return int(os.environ.get(name, str(default)))
+        return int(raw_value)
     except ValueError:
-        print(f"[CAMERA] Invalid {name}; using {default}")
+        print(f"[CAMERA] Invalid {name}; using {default!r}")
         return default
 
 
 def _apply_camera_controls(cap) -> None:
-    """Apply repeatable low-light controls after OpenCV opens the V4L2 device."""
+    """Apply only explicit overrides, preserving natural driver defaults."""
 
     controls = (
-        ("brightness", cv2.CAP_PROP_BRIGHTNESS, "JETARM_CAMERA_BRIGHTNESS", 12),
-        ("gain", cv2.CAP_PROP_GAIN, "JETARM_CAMERA_GAIN", 20),
-        ("gamma", cv2.CAP_PROP_GAMMA, "JETARM_CAMERA_GAMMA", 140),
+        ("brightness", cv2.CAP_PROP_BRIGHTNESS, "JETARM_CAMERA_BRIGHTNESS"),
+        ("gain", cv2.CAP_PROP_GAIN, "JETARM_CAMERA_GAIN"),
+        ("gamma", cv2.CAP_PROP_GAMMA, "JETARM_CAMERA_GAMMA"),
         (
             "backlight",
             getattr(cv2, "CAP_PROP_BACKLIGHT", None),
             "JETARM_CAMERA_BACKLIGHT",
-            2,
         ),
     )
-    for label, property_id, env_name, default in controls:
+    for label, property_id, env_name in controls:
         if property_id is None:
             continue
-        value = _env_int(env_name, default)
+        value = _env_int(env_name)
+        if value is None:
+            continue
         if not cap.set(property_id, value):
             print(f"[CAMERA] Driver ignored {label}={value}")
 
@@ -76,7 +80,8 @@ def _camera_loop(
 
     try:
         # Warm-up frames (helps exposure/auto-focus settle)
-        for _ in range(_env_int("JETARM_CAMERA_WARMUP_FRAMES", 30)):
+        warmup_frames = _env_int("JETARM_CAMERA_WARMUP_FRAMES", 30)
+        for _ in range(warmup_frames if warmup_frames is not None else 30):
             if _stop_event.is_set():
                 break
             cap.read()

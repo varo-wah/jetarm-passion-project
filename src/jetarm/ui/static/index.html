@@ -467,7 +467,7 @@
                 <div class="tag">Detection: <b id="lastDetText">--</b></div>
               </div>
             </div>
-            <div class="hint">Raw is camera-only, OpenCV is the legacy contour overlay, YOLO is the trained LEGO detector overlay.</div>
+            <div class="hint">All feeds use the natural camera image by default. Optional display tuning never changes the frame used for detection.</div>
           </div>
         </section>
 
@@ -911,7 +911,7 @@
           const s = await res.json();
 
           setConn(true);
-          $("stateText").textContent = s.state ?? "UNKNOWN";
+          $("stateText").textContent = s.motion_safety?.state ?? s.state ?? "UNKNOWN";
           $("lastActionText").textContent = s.last_action ?? "--";
           $("lastDetText").textContent = s.last_detection ?? "--";
           $("countText").textContent = s.sort_count ?? "--";

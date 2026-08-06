@@ -2,6 +2,7 @@ import unittest
 
 from jetarm.control.limits import JointLimitsError
 from jetarm.hardware import Class_Execution as hardware
+from jetarm.hardware.safety_state import MotionSafetyState
 
 
 class FakeArm:
@@ -18,6 +19,12 @@ class FakeArm:
 
 
 class HardwareSafetyTests(unittest.TestCase):
+    def test_process_local_safety_starts_paused(self):
+        safety = MotionSafetyState()
+
+        self.assertTrue(safety.snapshot().paused)
+        self.assertFalse(safety.snapshot().motion_allowed)
+
     def setUp(self):
         hardware.clear_estop()
         hardware.resume_system()
@@ -45,6 +52,20 @@ class HardwareSafetyTests(unittest.TestCase):
 
         self.assertFalse(self.ik.move_to(0, 15, 13))
         self.assertEqual(self.arm.commands, [])
+
+    def test_table_pose_submits_the_validated_ik_plan(self):
+        self.assertTrue(self.ik.move_to(0, 15, 13))
+
+        self.assertEqual(
+            self.arm.commands,
+            [("smooth", {1: 500, 2: 467, 3: 286, 4: 32}, 1.2, 24)],
+        )
+        self.assertEqual(self.ik.last_base_angle, 90.0)
+
+    def test_phase0_joint_limit_rejection_does_not_submit_motion(self):
+        self.assertFalse(self.ik.move_to(-20, 10, 10))
+        self.assertEqual(self.arm.commands, [])
+        self.assertEqual(self.ik.last_base_angle, 0.0)
 
     def test_clearing_estop_does_not_implicitly_resume_motion(self):
         hardware.estop_motion()

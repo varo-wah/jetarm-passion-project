@@ -5,6 +5,7 @@ import cv2  # L004
 import numpy as np  # L005
 
 from jetarm.config.paths import CALIBRATION_DIR
+from jetarm.vision.color_detection import detect_color
 
 # =====================================================  # L007
 # CONFIG  # L008
@@ -30,20 +31,6 @@ MAX_AREA = 20000  # L026
 ROI_SHRINK_FRAC = 0.08  # 8% inward  # L029
 ROI_SHRINK_MIN_PX = 2  # L030
 ROI_SHRINK_MAX_PX = 6  # L031
-
-# Color detection tuning  # L033
-BRIGHTNESS_ALPHA = 1.20  # contrast  # L034
-BRIGHTNESS_BETA = 15     # brightness  # L035
-
-# Neutral detection thresholds  # L037
-V_DARK_NEUTRAL = 45  # L038
-V_BRIGHT_MIN = 70  # L039
-S_NEUTRAL_MAX = 35  # L040
-NEUTRAL_BRIGHT_RATIO = 0.70  # L041
-
-# "Good color pixel" thresholds (adaptive V, fixed S)  # L043
-S_TH = 20  # L044
-GOOD_RATIO_MIN = 0.06  # L045
 
 # =====================================================  # L047
 # CALIBRATION LOAD  # L048
@@ -113,64 +100,6 @@ def apply_roi_mask(binary: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int, int,
 
     masked = cv2.bitwise_and(binary, roi_mask)  # L113
     return masked, (x0, y0, x1, y1)  # L114
-
-# =====================================================  # L116
-# COLOR DETECTION (returns: NEUTRAL / RED / GREEN / BLUE)  # L117
-# =====================================================  # L118
-
-def detect_color(frame: np.ndarray, x: int, y: int, w: int, h: int) -> str:  # L120
-    roi = frame[y:y+h, x:x+w]  # L121
-    if roi.size == 0:  # L122
-        return "NEUTRAL"  # L123
-
-    # Improve dark-brick visibility (software boost)  # L125
-    roi = cv2.convertScaleAbs(roi, alpha=BRIGHTNESS_ALPHA, beta=BRIGHTNESS_BETA)  # L126
-
-    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)  # L128
-    H = hsv[:, :, 0]  # L129
-    S = hsv[:, :, 1]  # L130
-    V = hsv[:, :, 2]  # L131
-
-    # -----------------------------  # L133
-    # A) Explicit NEUTRAL detection  # L134
-    # -----------------------------  # L135
-    v_med = float(np.median(V))  # L136
-
-    # Very dark -> neutral (shadow/black)  # L138
-    if v_med < V_DARK_NEUTRAL:  # L139
-        return "NEUTRAL"  # L140
-
-    # White/gray -> many pixels are bright but low saturation  # L142
-    bright = (V > V_BRIGHT_MIN)  # L143
-    bright_count = int(bright.sum())  # L144
-
-    if bright_count >= 30:  # L146
-        neutral_like = bright & (S < S_NEUTRAL_MAX)  # L147
-        neutral_ratio = int(neutral_like.sum()) / max(1, bright_count)  # L148
-        if neutral_ratio > NEUTRAL_BRIGHT_RATIO:  # L149
-            return "NEUTRAL"  # L150
-
-    # --------------------------------  # L152
-    # B) Colored classification (nearest of RED/GREEN/BLUE)  # L153
-    # --------------------------------  # L154
-    V_TH = max(25.0, v_med * 0.55)  # L155
-    good = (S > S_TH) & (V > V_TH)  # L156
-    good_ratio = int(good.sum()) / max(1, int(H.size))  # L157
-
-    if good_ratio < GOOD_RATIO_MIN:  # L159
-        return "NEUTRAL"  # L160
-
-    H_good = H[good].astype(np.uint8)  # L162
-    hist = cv2.calcHist([H_good], [0], None, [180], [0, 180])  # L163
-    h_peak = int(np.argmax(hist))  # L164
-
-    parents = {"RED": 0, "GREEN": 60, "BLUE": 120}  # L166
-
-    def hue_dist(a: int, b: int) -> int:  # L168
-        d = abs(a - b)  # L169
-        return min(d, 180 - d)  # L170
-
-    return min(parents, key=lambda k: hue_dist(h_peak, parents[k]))  # L172
 
 # =====================================================  # L174
 # SNAPSHOT BRICK DETECTION (FOR AUTOMATION)  # L175

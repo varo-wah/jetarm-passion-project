@@ -15,15 +15,13 @@ class FakeCapture:
 
 
 class CameraWorkerTests(unittest.TestCase):
-    def test_low_light_defaults_are_applied(self):
+    def test_driver_camera_defaults_are_preserved(self):
         capture = FakeCapture()
 
         with patch.dict(os.environ, {}, clear=True):
             camera_worker._apply_camera_controls(capture)
 
-        self.assertIn((camera_worker.cv2.CAP_PROP_BRIGHTNESS, 12), capture.settings)
-        self.assertIn((camera_worker.cv2.CAP_PROP_GAIN, 20), capture.settings)
-        self.assertIn((camera_worker.cv2.CAP_PROP_GAMMA, 140), capture.settings)
+        self.assertEqual(capture.settings, [])
 
     def test_camera_controls_support_environment_override(self):
         capture = FakeCapture()

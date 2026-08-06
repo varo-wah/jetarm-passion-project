@@ -10,10 +10,16 @@
   the listed node/process; centralized authority requires exactly one publisher.
 - If startup reports `/dev/video0` is busy, stop the listed camera owner before
   retrying. The dashboard camera worker must be the device's only owner.
-- If the dashboard feed is dark, tune the `JETARM_CAMERA_BRIGHTNESS`,
-  `JETARM_CAMERA_GAIN`, `JETARM_CAMERA_GAMMA`, and
-  `JETARM_CAMERA_BACKLIGHT` environment variables. The ROS
+- The camera uses its driver defaults unless a `JETARM_CAMERA_*` override is
+  explicitly provided. Keep the defaults for a natural image. If the raw feed
+  is genuinely underexposed, tune `JETARM_CAMERA_BRIGHTNESS`,
+  `JETARM_CAMERA_GAIN`, `JETARM_CAMERA_GAMMA`, or
+  `JETARM_CAMERA_BACKLIGHT` individually in preview mode. The ROS
   `usb_cam_param.yaml` is not used by the dashboard's OpenCV capture path.
+- Raw is always unmodified. OpenCV and YOLO display processing also defaults to
+  natural output (`JETARM_DISPLAY_GAMMA=1.00` and
+  `JETARM_DISPLAY_SATURATION=1.00`). Set display gamma below `1.00` only when a
+  non-detection preview needs a modest shadow lift.
 - If scanner preflight rejects a target, do not expand joint limits. Reposition
   the object or calibrate the bucket/arm geometry; no object has been gripped at
   the time of a preflight rejection.

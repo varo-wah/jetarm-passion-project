@@ -3,14 +3,12 @@ from typing import Dict, List, Tuple  # L002
 import cv2  # L004
 import numpy as np  # L005
 
+from jetarm.vision.color_detection import detect_color
+
 from jetarm.config.paths import CALIBRATION_DIR
 from jetarm.config.vision_config import (
-    BRIGHTNESS_ALPHA,
-    BRIGHTNESS_BETA,
-    GOOD_RATIO_MIN,
     MAX_AREA,
     MIN_AREA,
-    NEUTRAL_BRIGHT_RATIO,
     ROI_SHRINK_FRAC,
     ROI_SHRINK_MAX_PX,
     ROI_SHRINK_MIN_PX,
@@ -18,10 +16,6 @@ from jetarm.config.vision_config import (
     ROI_X1_FRAC,
     ROI_Y0_FRAC,
     ROI_Y1_FRAC,
-    S_NEUTRAL_MAX,
-    S_THRESHOLD,
-    V_BRIGHT_MIN,
-    V_DARK_NEUTRAL,
 )
 
 # =====================================================  # L007
@@ -32,8 +26,6 @@ BASE = CALIBRATION_DIR  # L012
 
 HOMOGRAPHY_FILE = "homography_sheet.npy"  # L014
 AFFINE_FILE = "affine_sheet_to_robot.npy"  # L015
-
-S_TH = S_THRESHOLD  # L044
 
 # =====================================================  # L047
 # CALIBRATION LOAD  # L048
@@ -105,63 +97,8 @@ def apply_roi_mask(binary: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int, int,
     return masked, (x0, y0, x1, y1)  # L114
 
 # =====================================================  # L116
-# COLOR DETECTION (returns: NEUTRAL / RED / GREEN / BLUE)  # L117
-# =====================================================  # L118
-
-def detect_color(frame: np.ndarray, x: int, y: int, w: int, h: int) -> str:  # L120
-    roi = frame[y:y+h, x:x+w]  # L121
-    if roi.size == 0:  # L122
-        return "NEUTRAL"  # L123
-
-    # Improve dark-brick visibility (software boost)  # L125
-    roi = cv2.convertScaleAbs(roi, alpha=BRIGHTNESS_ALPHA, beta=BRIGHTNESS_BETA)  # L126
-
-    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)  # L128
-    H = hsv[:, :, 0]  # L129
-    S = hsv[:, :, 1]  # L130
-    V = hsv[:, :, 2]  # L131
-
-    # -----------------------------  # L133
-    # A) Explicit NEUTRAL detection  # L134
-    # -----------------------------  # L135
-    v_med = float(np.median(V))  # L136
-
-    # Very dark -> neutral (shadow/black)  # L138
-    if v_med < V_DARK_NEUTRAL:  # L139
-        return "NEUTRAL"  # L140
-
-    # White/gray -> many pixels are bright but low saturation  # L142
-    bright = (V > V_BRIGHT_MIN)  # L143
-    bright_count = int(bright.sum())  # L144
-
-    if bright_count >= 30:  # L146
-        neutral_like = bright & (S < S_NEUTRAL_MAX)  # L147
-        neutral_ratio = int(neutral_like.sum()) / max(1, bright_count)  # L148
-        if neutral_ratio > NEUTRAL_BRIGHT_RATIO:  # L149
-            return "NEUTRAL"  # L150
-
-    # --------------------------------  # L152
-    # B) Colored classification (nearest of RED/GREEN/BLUE)  # L153
-    # --------------------------------  # L154
-    V_TH = max(25.0, v_med * 0.55)  # L155
-    good = (S > S_TH) & (V > V_TH)  # L156
-    good_ratio = int(good.sum()) / max(1, int(H.size))  # L157
-
-    if good_ratio < GOOD_RATIO_MIN:  # L159
-        return "NEUTRAL"  # L160
-
-    H_good = H[good].astype(np.uint8)  # L162
-    hist = cv2.calcHist([H_good], [0], None, [180], [0, 180])  # L163
-    h_peak = int(np.argmax(hist))  # L164
-
-    parents = {"RED": 0, "GREEN": 60, "BLUE": 120}  # L166
-
-    def hue_dist(a: int, b: int) -> int:  # L168
-        d = abs(a - b)  # L169
-        return min(d, 180 - d)  # L170
-
-    return min(parents, key=lambda k: hue_dist(h_peak, parents[k]))  # L172
-
+# COLOR DETECTION is imported from jetarm.vision.color_detection so the legacy
+# viewer and the YOLO pipeline use the same classifier.
 # =====================================================  # L174
 # SNAPSHOT BRICK DETECTION (FOR AUTOMATION)  # L175
 # =====================================================  # L176

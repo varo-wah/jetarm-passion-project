@@ -32,21 +32,21 @@ The vendor service remains stopped after this launcher exits because restarting
 it can command an initial pose. Reboot to restore the normal vendor application,
 or restart it manually only after the servo power and workspace are safe.
 
-The dashboard camera worker applies a repeatable low-light profile when it opens
-`/dev/video0`: brightness `12`, gain `20`, gamma `140`, and backlight
-compensation `2`. Override individual values before launching when lighting
-conditions change:
+The dashboard camera worker preserves the camera driver's natural defaults when
+it opens `/dev/video0`. Apply individual controls only when preview-mode testing
+shows a repeatable exposure problem:
 
 ```bash
 JETARM_CAMERA_BRIGHTNESS=7 \
 JETARM_CAMERA_GAIN=11 \
 JETARM_CAMERA_GAMMA=120 \
 JETARM_CAMERA_BACKLIGHT=1 \
-./scripts/run_jetarm.sh --actuate
+./scripts/run_jetarm.sh --preview
 ```
 
-These settings belong to the dashboard's OpenCV camera owner. Editing the
-vendor `usb_cam_param.yaml` does not configure this capture path.
+Unset values are not written to the camera. These settings belong to the
+dashboard's OpenCV camera owner; editing the vendor `usb_cam_param.yaml` does
+not configure this capture path.
 
 Motion requests retain their requested duration when it is already safe. If a
 request would exceed a calibrated joint velocity, the central controller

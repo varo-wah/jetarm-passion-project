@@ -73,6 +73,17 @@ print_servo_topic_owners() {
     ros2 topic info -v /ros_robot_controller/bus_servo/set_position 2>/dev/null || true
 }
 
+controller_interfaces_ready() {
+    local action_list service_list service_name
+    action_list="$(ros2 action list 2>/dev/null || true)"
+    service_list="$(ros2 service list 2>/dev/null || true)"
+
+    grep -Fxq "/jetarm_controller/follow_joint_trajectory" <<<"$action_list" || return 1
+    for service_name in pause resume estop clear_estop safe_shutdown; do
+        grep -Fxq "/jetarm_controller/$service_name" <<<"$service_list" || return 1
+    done
+}
+
 stop_process_group() {
     local leader_pid="$1"
     [[ -z "$leader_pid" ]] && return 0
@@ -178,7 +189,7 @@ if [[ "$actuation_enabled" == "1" ]]; then
             echo "ERROR: Central JetArm controller exited during startup." >&2
             exit 4
         fi
-        if python3 -c "from jetarm.control.client import JetArmControlClient; c = JetArmControlClient(wait_seconds=0.25); c.close()" >/dev/null 2>&1; then
+        if controller_interfaces_ready; then
             controller_ready=1
             break
         fi

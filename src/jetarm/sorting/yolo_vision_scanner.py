@@ -263,12 +263,12 @@ def preflight_pick_and_drop(brick):
         (0, 13, 14, "transfer waypoint"),
         (bx, by, APPROACH_BUCKET, f"{brick.get('color', 'NEUTRAL')} bucket"),
     )
-    approach_targets = None
+    approach_plan = None
     for route_x, route_y, route_z, label in route:
         try:
-            targets = ik.plan_to(route_x, route_y, route_z)
+            plan = ik.plan_to(route_x, route_y, route_z)
             if label == "target approach":
-                approach_targets = targets
+                approach_plan = plan
         except (JointLimitsError, RuntimeError, ValueError) as error:
             _last_preflight_skip = build_event(
                 severity="warning",
@@ -284,7 +284,7 @@ def preflight_pick_and_drop(brick):
 
     try:
         angle, _ = choose_safe_wrist_angle(brick, brick.get("frame_shape"))
-        base_angle = (approach_targets[1] - ik.BASE_ZERO_OFFSET) * ik.DEG_PER_PULSE
+        base_angle = approach_plan.angles.base_deg
         gripper.plan_wrist(angle, base_angle=base_angle)
         gripper.plan_gripper()
     except (JointLimitsError, RuntimeError, ValueError) as error:

@@ -108,6 +108,51 @@ class ServerSafetyTests(unittest.TestCase):
         self.assertTrue(hardware.motion_safety_status()["estop_latched"])
         self.assertIsNone(server_app._scanner_proc)
 
+    def test_estop_failure_is_not_reported_as_success(self):
+        with patch.object(server_app, "estop_motion", return_value=False), patch.object(
+            server_app,
+            "motion_safety_status",
+            return_value={"state": "FAULT"},
+        ):
+            response = server_app.api_cmd({"type": "estop"})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response_payload(response)["ok"])
+        self.assertEqual(server_app._active_alert["code"], "E_STOP_FAILED")
+
+    def test_stop_failure_is_not_reported_as_success(self):
+        with patch.object(server_app, "stop_motion", return_value=False), patch.object(
+            server_app,
+            "motion_safety_status",
+            return_value={"state": "FAULT"},
+        ):
+            response = server_app.api_cmd({"type": "stop"})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response_payload(response)["ok"])
+
+    def test_pause_failure_is_not_reported_as_success(self):
+        with patch.object(server_app, "pause_system", return_value=False), patch.object(
+            server_app,
+            "motion_safety_status",
+            return_value={"state": "FAULT"},
+        ):
+            response = server_app.api_cmd({"type": "pause"})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response_payload(response)["ok"])
+
+    def test_clear_estop_failure_is_not_reported_as_success(self):
+        with patch.object(server_app, "clear_estop", return_value=False), patch.object(
+            server_app,
+            "motion_safety_status",
+            return_value={"state": "ESTOP_LATCHED"},
+        ):
+            response = server_app.api_cmd({"type": "clear_estop"})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response_payload(response)["ok"])
+
     def test_manual_gripper_command_is_blocked_while_scanner_runs(self):
         server_app._scanner_proc = FakeProcess()
 

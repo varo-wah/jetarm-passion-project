@@ -1,8 +1,8 @@
-import math
 import time
 
-from jetarm.control.limits import JointLimitsError, load_joint_limits, validate_pulse_targets
+from jetarm.control.limits import JointLimitsError, validate_pulse_targets
 from jetarm.hardware.classCreation import CKMJetArm
+from jetarm.hardware.inverse_kinematics import IKError, IKPlan, JetArmKinematics
 from jetarm.hardware.safety_state import MOTION_SAFETY
 
 class _UnavailableArm:
@@ -70,158 +70,117 @@ class JetArmIK:
     move_to(x,y,z): Z is TABLE-REFERENCED TIP HEIGHT (cm above table) ✅
     move_to_wrist(x,y,z): Z is the old WRIST/J3 endpoint height used by your original IK ✅
     """
-    def __init__(self):
+    def __init__(self, kinematics: JetArmKinematics | None = None):
         self.Arm = Arm
-        self.L1 = 15.0
-        self.L2 = 15.0
+        self.kinematics = kinematics or JetArmKinematics()
+        config = self.kinematics.config
 
-        self.DEG_PER_PULSE = 0.24
-        self.BASE_ZERO_OFFSET = 125.0
-        self.ANGLE_ZERO_OFFSET = 125.0
-
+        # Compatibility attributes for existing scripts and calibration notes.
+        self.L1 = config.link1_cm
+        self.L2 = config.link2_cm
+        self.DEG_PER_PULSE = config.degrees_per_pulse
+        self.BASE_ZERO_OFFSET = config.base_zero_offset
+        self.ANGLE_ZERO_OFFSET = config.arm_zero_offset
         self.ELBOW_UP = True
         self.last_base_angle = 0.0
-        self._limits = load_joint_limits()
-
-        # --- Your calibration (OPEN gripper, fixed wrist angle) ---
-        # (0,15,20)->11 and (0,15,15)->7  => slope 0.8, bias -4.5
-        # z_tip ≈ 0.8*z_wrist - 4.5 - sag(r)
-        self.Z_TIP_PER_Z_WRIST = 0.8
-        self.Z_TIP_BIAS_CM = -4.5
-
-        # sag(r) at z_wrist=15: r=10->0.0, r=15->0.5, r=20->1.1, r=25->1.7
-        self.SAG_TABLE = [(10.0, 0.0), (15.0, 0.5), (20.0, 1.1), (25.0, 1.7)]
-        self.SAG_MAX_CM = 5.0
+        self._limits = self.kinematics.joint_limits
+        self.Z_TIP_PER_Z_WRIST = config.tip_per_wrist_height
+        self.Z_TIP_BIAS_CM = config.tip_height_bias_cm
+        self.SAG_TABLE = list(config.sag_table)
+        self.SAG_MAX_CM = config.sag_max_cm
 
     def base_to_pulse(self, angle_deg):
-        return int(round(angle_deg / self.DEG_PER_PULSE + self.BASE_ZERO_OFFSET))
+        return self.kinematics.base_to_pulse(angle_deg)
 
     def arm_to_pulse(self, arm_deg):
-        return int(round(arm_deg / self.DEG_PER_PULSE + self.ANGLE_ZERO_OFFSET))
+        return self.kinematics.arm_to_pulse(arm_deg)
 
     def _sag_cm(self, r_cm: float) -> float:
-        t = self.SAG_TABLE
-        if r_cm <= t[0][0]:
-            return max(0.0, min(self.SAG_MAX_CM, t[0][1]))
-        if r_cm >= t[-1][0]:
-            return max(0.0, min(self.SAG_MAX_CM, t[-1][1]))
-
-        for i in range(len(t) - 1):
-            r0, s0 = t[i]
-            r1, s1 = t[i + 1]
-            if r0 <= r_cm <= r1:
-                u = (r_cm - r0) / (r1 - r0)
-                return max(0.0, min(self.SAG_MAX_CM, s0 + u * (s1 - s0)))
-
-        return 0.0
+        return self.kinematics.sag_cm(r_cm)
 
     def _z_table_to_wrist(self, x: float, y: float, z_table_cm: float) -> float:
-        # z_tip ≈ a*z_wrist + b - sag(r)  =>  z_wrist = (z_tip - b + sag)/a
-        r = math.hypot(x, y)
-        sag = self._sag_cm(r)
-        a = self.Z_TIP_PER_Z_WRIST
-        b = self.Z_TIP_BIAS_CM
-        return (z_table_cm - b + sag) / a
+        return self.kinematics.table_to_wrist_height(x, y, z_table_cm)
 
-    def calculate_angles(self, x, y, z_wrist, *, update_continuity=True):
-        # 1) Base angle
-        base_angle = math.degrees(math.atan2(y, x))
+    def calculate_angles(self, x, y, z_wrist):
+        angles = self.kinematics.solve_angles(
+            x,
+            y,
+            z_wrist,
+            previous_base_deg=self.last_base_angle,
+            elbow_up=self.ELBOW_UP,
+        )
+        self.last_base_angle = angles.base_deg
+        return angles.as_tuple()
 
-        # 2) Continuity seam-fix
-        prev = getattr(self, "last_base_angle", 0.0)
-        if prev - base_angle > 180.0:
-            base_angle += 360.0
-        elif base_angle - prev > 180.0:
-            base_angle -= 360.0
-        if update_continuity:
-            self.last_base_angle = base_angle
-
-        # 3) Planar IK (your method, with a safe reach guard)
-        l = math.hypot(x, y)
-        d = math.hypot(l, z_wrist)
-        h = d / 2.0
-
-        cos_arg = h / self.L1
-        if cos_arg < -1.0 or cos_arg > 1.0:
-            raise ValueError("Target out of reach for current IK geometry")
-
-        theta = math.degrees(math.acos(cos_arg))
-        phi = math.degrees(math.atan2(z_wrist, l))
-
-        if self.ELBOW_UP:
-            L1_angle = phi + theta
-        else:
-            L1_angle = phi - theta
-
-        intersection = 180.0 - (2.0 * theta)
-        if self.ELBOW_UP:
-            L2_angle = intersection - 90.0
-        else:
-            L2_angle = 360.0 - (intersection + 90.0)
-
-        L3_angle = 90.0 - (L2_angle + L1_angle)
-
-        return base_angle, L1_angle, L2_angle, L3_angle
-
-    def _pulse_targets(self, base_angle, L1_angle, L2_angle, L3_angle):
-        return validate_pulse_targets(
-            {
-                1: self.base_to_pulse(base_angle),
-                2: self.arm_to_pulse(L1_angle),
-                3: self.arm_to_pulse(L2_angle),
-                4: self.arm_to_pulse(L3_angle) + 35,
-            },
-            self._limits,
+    def plan_to_wrist(self, x, y, z_wrist) -> IKPlan:
+        return self.kinematics.plan_wrist(
+            x,
+            y,
+            z_wrist,
+            previous_base_deg=self.last_base_angle,
+            elbow_up=self.ELBOW_UP,
         )
 
-    def plan_to_wrist(self, x, y, z_wrist):
-        angles = self.calculate_angles(x, y, z_wrist, update_continuity=False)
-        return self._pulse_targets(*angles)
+    def plan_to(self, x, y, z_table) -> IKPlan:
+        return self.kinematics.plan_table(
+            x,
+            y,
+            z_table,
+            previous_base_deg=self.last_base_angle,
+            elbow_up=self.ELBOW_UP,
+        )
 
-    def plan_to(self, x, y, z_table):
-        return self.plan_to_wrist(x, y, self._z_table_to_wrist(x, y, z_table))
-
-    def _apply_pulses(self, base_angle, L1_angle, L2_angle, L3_angle, x, y, z_wrist):
-        try:
-            targets = self._pulse_targets(base_angle, L1_angle, L2_angle, L3_angle)
-        except JointLimitsError as error:
-            print(
-                f"❌ Calibrated joint limit rejected x={x:.1f}, y={y:.1f}, "
-                f"z_wrist={z_wrist:.1f} ({error})"
-            )
-            return False
-
+    def _execute_plan(self, plan: IKPlan) -> bool:
+        targets = plan.servo_targets
         print(
-            f"Smooth moving to: {targets[1]}, {targets[2]}, "
-            f"{targets[3]}, {targets[4]}"
+            "Smooth moving to: "
+            f"{targets[1]}, {targets[2]}, {targets[3]}, {targets[4]}"
         )
-        return self.Arm.smoothMoveJetArmGroup(
+        ok = self.Arm.smoothMoveJetArmGroup(
             targets,
             duration=1.2,
             steps=24,
         )
+        if ok:
+            self.last_base_angle = plan.angles.base_deg
+        return ok
+
+    @staticmethod
+    def _report_plan_error(x, y, z_name, z_value, error: Exception) -> None:
+        print(
+            f"❌ IK planning failed for x={x!r}, y={y!r}, "
+            f"{z_name}={z_value!r} ({error})"
+        )
+
+    def _move_with_plan(self, planner, x, y, z, z_name) -> bool:
+        if not motion_is_allowed():
+            print("🛑 Motion safety latch blocked IK movement")
+            return False
+
+        try:
+            plan = planner(x, y, z)
+        except (IKError, JointLimitsError) as error:
+            self._report_plan_error(x, y, z_name, z, error)
+            return False
+        return self._execute_plan(plan)
 
     def move_to_wrist(self, x, y, z_wrist):
-        if not motion_is_allowed():
-            print("🛑 Motion safety latch blocked IK movement")
-            return False
-
-        # Old behavior (raw IK wrist Z)
-        try:
-            base_angle, L1_angle, L2_angle, L3_angle = self.calculate_angles(x, y, z_wrist)
-        except ValueError as e:
-            print(f"❌ IK math failed for x={x:.1f}, y={y:.1f}, z_wrist={z_wrist:.1f} ({e})")
-            return False
-        return self._apply_pulses(base_angle, L1_angle, L2_angle, L3_angle, x, y, z_wrist)
+        return self._move_with_plan(
+            self.plan_to_wrist,
+            x,
+            y,
+            z_wrist,
+            "z_wrist",
+        )
 
     def move_to(self, x, y, z_table):
-        if not motion_is_allowed():
-            print("🛑 Motion safety latch blocked IK movement")
-            return False
-
-        # New default behavior: table-referenced tip height
-        z_wrist = self._z_table_to_wrist(x, y, z_table)
-        return self.move_to_wrist(x, y, z_wrist)
+        return self._move_with_plan(
+            self.plan_to,
+            x,
+            y,
+            z_table,
+            "z_table",
+        )
 
 
 class JetArmGripper:

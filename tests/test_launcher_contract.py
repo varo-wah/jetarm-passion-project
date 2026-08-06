@@ -20,6 +20,11 @@ class LauncherContractTests(unittest.TestCase):
         self.assertIn('stop_process_group "$controller_pid"', LAUNCHER)
         self.assertIn('stop_process_group "$driver_pid"', LAUNCHER)
 
+    def test_controller_readiness_does_not_spawn_short_lived_ros_clients(self):
+        self.assertIn("controller_interfaces_ready", LAUNCHER)
+        self.assertIn("/jetarm_controller/follow_joint_trajectory", LAUNCHER)
+        self.assertNotIn("JetArmControlClient(wait_seconds", LAUNCHER)
+
 
 if __name__ == "__main__":
     unittest.main()
