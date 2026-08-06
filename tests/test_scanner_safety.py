@@ -8,6 +8,10 @@ from jetarm.sorting import yolo_vision_scanner as scanner
 
 
 class ScannerSafetyTests(unittest.TestCase):
+    def setUp(self):
+        scanner._last_abort_event = None
+        scanner._last_preflight_skip = None
+
     def test_actuation_environment_defaults_to_false(self):
         with patch.dict("os.environ", {}, clear=True):
             self.assertFalse(scanner.env_flag(scanner.ACTUATION_ENV, default=False))
@@ -77,6 +81,51 @@ class ScannerSafetyTests(unittest.TestCase):
             side_effect=JointLimitsError("elbow_joint: outside calibrated range"),
         ):
             self.assertFalse(scanner.move_wait(1.0, 10.0, 7.0, "approach"))
+
+        self.assertEqual(scanner._last_abort_event["code"], "JOINT_LIMIT")
+        self.assertEqual(scanner._last_abort_event["stage"], "motion")
+        self.assertEqual(scanner._last_abort_event["object_state"], "not_gripped")
+
+    def test_structured_event_is_forwarded_with_scanner_token(self):
+        event = scanner.build_event(
+            severity="abort",
+            code="JOINT_LIMIT",
+            stage_name="target_pickup",
+            summary="Target rejected",
+            detail="elbow pulse 112 below 120",
+            action="Move the object and retry.",
+        )
+        response = Mock()
+        response.raise_for_status.return_value = None
+
+        with patch.dict(
+            "os.environ",
+            {scanner.SCANNER_EVENT_TOKEN_ENV: "scanner-secret"},
+        ), patch.object(scanner.requests, "post", return_value=response) as post:
+            self.assertTrue(scanner.report_event(event))
+
+        _, kwargs = post.call_args
+        self.assertEqual(kwargs["json"], event)
+        self.assertEqual(kwargs["headers"]["X-JetArm-Scanner-Token"], "scanner-secret")
+        self.assertEqual(kwargs["timeout"], 0.75)
+
+    def test_run_reports_the_exact_remembered_abort_before_reraising(self):
+        error = JointLimitsError("elbow_joint pulse 112 is below minimum 120")
+        remembered = scanner.remember_abort(
+            error=error,
+            stage_name="target_pickup",
+            summary="Target pickup motion rejected",
+            action="Move the object farther from the base.",
+        )
+
+        with patch.object(scanner, "main", side_effect=error), patch.object(
+            scanner,
+            "report_event",
+        ) as report:
+            with self.assertRaises(JointLimitsError):
+                scanner.run()
+
+        report.assert_called_once_with(remembered)
 
 
 if __name__ == "__main__":

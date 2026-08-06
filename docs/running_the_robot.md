@@ -54,6 +54,14 @@ automatically extends only that trajectory to the shortest permitted duration.
 The scanner also preflights the full target, transfer, bucket, wrist, and
 gripper route before moving toward a detected object.
 
+Scanner warnings and aborts are forwarded to the dashboard as structured
+events. The persistent banner reports the source, stage, code, exact cause,
+motion state, object state, and recovery action. Red abort/fault events stop the
+auto-cycle and pause motion; amber preflight warnings do not pause the robot.
+The Acknowledge button dismisses only the message—it does not clear an E-stop or
+resume motion. The five most recent events remain available under **Recent
+alert history**.
+
 The dashboard's stop, pause, E-stop, scanner, person-follow, and manual-motion
 paths are software controls. They do not replace the robot's physical power
 isolation or hardware emergency-stop procedure.

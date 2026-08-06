@@ -17,4 +17,13 @@
 - If scanner preflight rejects a target, do not expand joint limits. Reposition
   the object or calibrate the bucket/arm geometry; no object has been gripped at
   the time of a preflight rejection.
+- Read the dashboard alert by field: **Where** identifies the failed stage,
+  **Code** classifies the fault, **Robot state** confirms whether motion is
+  paused, **Object state** states whether an object may still be held, and
+  **What to do** gives the recovery action. Acknowledging an alert never resumes
+  motion or clears an E-stop.
+- An amber `NO_SAFE_ROUTE` warning means detections were rejected before any
+  pickup motion. A red abort/fault means the scanner auto-cycle was stopped and
+  motion authority was paused. Preserve the copied diagnostics when reporting a
+  repeatable failure.
 - If pixel-to-robot conversion fails, verify the calibration files exist in `data/calibration/`.

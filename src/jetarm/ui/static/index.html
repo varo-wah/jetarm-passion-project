@@ -316,6 +316,84 @@
         font-size:12px;
         margin-top:8px;
       }
+      .alert-banner{
+        border:1px solid rgba(255,77,94,.72);
+        border-left:5px solid var(--red);
+        background:#271017;
+        border-radius:var(--radius);
+        box-shadow:var(--shadow);
+        margin-bottom:16px;
+        padding:14px;
+      }
+      .alert-banner[hidden], .alert-history[hidden]{display:none}
+      .alert-banner.warning{
+        border-color:rgba(242,201,76,.7);
+        border-left-color:var(--yellow);
+        background:#26210f;
+      }
+      .alert-banner.estop{
+        border-color:var(--red);
+        border-left-color:var(--red);
+        background:#351016;
+      }
+      .alert-head{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:12px;
+      }
+      .alert-heading{font-size:16px; font-weight:800}
+      .alert-severity{
+        display:inline-block;
+        margin-right:8px;
+        border:1px solid currentColor;
+        border-radius:999px;
+        padding:3px 7px;
+        color:var(--red);
+        font-size:11px;
+        letter-spacing:.6px;
+      }
+      .warning .alert-severity{color:var(--yellow)}
+      .alert-grid{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0,1fr));
+        gap:10px;
+        margin-top:12px;
+      }
+      @media (max-width:760px){.alert-grid{grid-template-columns:1fr}}
+      .alert-field{
+        border:1px solid rgba(149,167,188,.22);
+        border-radius:7px;
+        background:rgba(0,0,0,.16);
+        padding:9px;
+      }
+      .alert-field.wide{grid-column:1/-1}
+      .alert-label{
+        color:var(--muted);
+        font-size:10px;
+        font-weight:800;
+        letter-spacing:.6px;
+        text-transform:uppercase;
+      }
+      .alert-value{margin-top:3px; font-size:13px; overflow-wrap:anywhere}
+      .alert-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
+      .alert-actions .btn{flex:0 1 auto; min-height:36px; padding:8px 12px}
+      .alert-history{
+        margin:0 0 16px;
+        border:1px solid var(--line);
+        border-radius:8px;
+        background:var(--surface3);
+        padding:9px 12px;
+        color:var(--muted);
+        font-size:12px;
+      }
+      .alert-history summary{cursor:pointer; color:var(--text); font-weight:700}
+      .alert-history-item{
+        border-top:1px solid var(--line);
+        margin-top:8px;
+        padding-top:8px;
+      }
+      .alert-history-item b{color:var(--text)}
     </style>
   </head>
 
@@ -339,6 +417,32 @@
     </header>
 
     <main class="wrap">
+      <section id="alertBanner" class="alert-banner" role="alert" aria-live="assertive" hidden>
+        <div class="alert-head">
+          <div class="alert-heading">
+            <span class="alert-severity" id="alertSeverity">ABORT</span>
+            <span id="alertSummary">Operation interrupted</span>
+          </div>
+          <div class="mono" id="alertTime">--</div>
+        </div>
+        <div class="alert-grid">
+          <div class="alert-field"><div class="alert-label">Where</div><div class="alert-value" id="alertStage">--</div></div>
+          <div class="alert-field"><div class="alert-label">Code</div><div class="alert-value" id="alertCode">--</div></div>
+          <div class="alert-field"><div class="alert-label">Robot state</div><div class="alert-value" id="alertMotion">--</div></div>
+          <div class="alert-field"><div class="alert-label">Object state</div><div class="alert-value" id="alertObject">--</div></div>
+          <div class="alert-field"><div class="alert-label">Source</div><div class="alert-value" id="alertSource">--</div></div>
+          <div class="alert-field wide"><div class="alert-label">Why</div><div class="alert-value" id="alertDetail">--</div></div>
+          <div class="alert-field wide"><div class="alert-label">What to do</div><div class="alert-value" id="alertAction">--</div></div>
+        </div>
+        <div class="alert-actions">
+          <button class="btn btn-primary" id="btnAlertAck">Acknowledge Alert</button>
+          <button class="btn" id="btnAlertCopy">Copy Diagnostics</button>
+        </div>
+      </section>
+      <details id="alertHistory" class="alert-history" hidden>
+        <summary>Recent alert history</summary>
+        <div id="alertHistoryList"></div>
+      </details>
       <div class="layout">
         <section class="card">
           <div class="card-head">
@@ -528,6 +632,17 @@
     <script>
       const $ = (id) => document.getElementById(id);
       let joySpeed = 0.3;
+      let currentAlert = null;
+
+      async function responseError(res){
+        const text = await res.text();
+        try {
+          const payload = JSON.parse(text);
+          return payload.error || payload.detail || text || `HTTP ${res.status}`;
+        } catch (_error) {
+          return text || `HTTP ${res.status}`;
+        }
+      }
 
       function setConn(ok){
         $("connDot").style.background = ok ? "var(--green)" : "var(--red)";
@@ -559,19 +674,19 @@
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({type, ...payload}),
         });
-        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+        if (!res.ok) throw new Error(await responseError(res));
         return await res.json();
       }
 
       async function postScanner(path){
         const res = await fetch(path, {method:"POST"});
-        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+        if (!res.ok) throw new Error(await responseError(res));
         return await res.json();
       }
 
       async function postPersonFollow(path){
         const res = await fetch(path, {method:"POST"});
-        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+        if (!res.ok) throw new Error(await responseError(res));
         return await res.json();
       }
 
@@ -622,13 +737,13 @@
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({dx:cmToTicks(dxCm), dy:cmToTicks(dyCm), dz:cmToTicks(dzCm)}),
         });
-        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+        if (!res.ok) throw new Error(await responseError(res));
         return await res.json();
       }
 
       async function postJoystickReset(){
         const res = await fetch("/api/joystick/reset", {method:"POST"});
-        if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+        if (!res.ok) throw new Error(await responseError(res));
         return await res.json();
       }
 
@@ -693,6 +808,96 @@
         try { await postJoystickReset(); } catch(e){ alert(`Reset failed: ${e.message}`); }
       };
 
+      function displayTimestamp(value){
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? (value || "--") : date.toLocaleTimeString();
+      }
+
+      function alertDiagnostics(alertData){
+        return [
+          `${String(alertData.severity || "alert").toUpperCase()}: ${alertData.summary || "Operation interrupted"}`,
+          `Source: ${alertData.source || "--"}`,
+          `Stage: ${alertData.stage || "--"}`,
+          `Code: ${alertData.code || "--"}`,
+          `Motion: ${alertData.motion_state || "--"}`,
+          `Object: ${alertData.object_state || "--"}`,
+          `Detail: ${alertData.detail || "--"}`,
+          `Action: ${alertData.action || "--"}`,
+          `Time: ${alertData.timestamp || "--"}`,
+        ].join("\n");
+      }
+
+      function renderActiveAlert(alertData, motionSafety){
+        const banner = $("alertBanner");
+        currentAlert = alertData || null;
+        if (!currentAlert){
+          banner.hidden = true;
+          return;
+        }
+
+        const severity = String(currentAlert.severity || "abort").toLowerCase();
+        banner.className = `alert-banner ${severity}`;
+        banner.hidden = false;
+        $("alertSeverity").textContent = severity.toUpperCase();
+        $("alertSummary").textContent = currentAlert.summary || "Operation interrupted";
+        $("alertTime").textContent = displayTimestamp(currentAlert.timestamp);
+        $("alertStage").textContent = currentAlert.stage || "--";
+        $("alertCode").textContent = currentAlert.code || "--";
+        $("alertMotion").textContent =
+          currentAlert.motion_state && currentAlert.motion_state !== "UNKNOWN"
+            ? currentAlert.motion_state
+            : (motionSafety?.state || "UNKNOWN");
+        $("alertObject").textContent = currentAlert.object_state || "unknown";
+        $("alertSource").textContent = currentAlert.source || "system";
+        $("alertDetail").textContent = currentAlert.detail || "No detail provided";
+        $("alertAction").textContent = currentAlert.action || "Inspect the robot before retrying.";
+        $("btnAlertAck").textContent = currentAlert.requires_ack ? "Acknowledge Alert" : "Dismiss Notice";
+      }
+
+      function renderAlertHistory(history){
+        const panel = $("alertHistory");
+        const list = $("alertHistoryList");
+        list.replaceChildren();
+        const alerts = Array.isArray(history) ? history.slice(0, 5) : [];
+        panel.hidden = alerts.length === 0;
+        for (const item of alerts){
+          const row = document.createElement("div");
+          row.className = "alert-history-item";
+          const heading = document.createElement("b");
+          heading.textContent = `${String(item.severity || "alert").toUpperCase()} · ${item.summary || "Operation interrupted"}`;
+          const detail = document.createElement("div");
+          detail.textContent = `${item.stage || "unknown"} · ${item.code || "UNSPECIFIED"} · ${displayTimestamp(item.timestamp)}`;
+          row.append(heading, detail);
+          list.append(row);
+        }
+      }
+
+      $("btnAlertAck").onclick = async () => {
+        if (!currentAlert) return;
+        const res = await fetch("/api/alerts/acknowledge", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({id:currentAlert.id}),
+        });
+        if (!res.ok){
+          alert(`Acknowledge failed: ${await responseError(res)}`);
+          return;
+        }
+        renderActiveAlert(null);
+        await refreshStatus();
+      };
+
+      $("btnAlertCopy").onclick = async () => {
+        if (!currentAlert) return;
+        try {
+          await navigator.clipboard.writeText(alertDiagnostics(currentAlert));
+          $("btnAlertCopy").textContent = "Copied";
+          setTimeout(() => { $("btnAlertCopy").textContent = "Copy Diagnostics"; }, 1200);
+        } catch (error) {
+          alert(`Copy failed: ${error.message}`);
+        }
+      };
+
       function setScannerText(running){
         const text = running ? "RUNNING" : "OFF";
         $("scannerText").textContent = text;
@@ -711,6 +916,8 @@
           $("lastDetText").textContent = s.last_detection ?? "--";
           $("countText").textContent = s.sort_count ?? "--";
           $("errText").textContent = s.last_error ?? "--";
+          renderActiveAlert(s.active_alert, s.motion_safety);
+          renderAlertHistory(s.alert_history);
           $("serverTime").textContent = s.server_time ?? "--";
           setScannerText(!!s.scanner_running);
           if (s.scanner_actuation_requested && !s.hardware_available){

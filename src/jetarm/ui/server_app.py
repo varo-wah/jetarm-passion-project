@@ -1,5 +1,8 @@
 import os
+import secrets
 import time
+import uuid
+from collections import deque
 from datetime import datetime
 from typing import Generator
 import sys
@@ -9,7 +12,7 @@ import threading
 from pathlib import Path
 
 import cv2
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, Header
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -66,7 +69,16 @@ def on_startup() -> None:
     if SCANNER_ACTUATION_REQUESTED and not HARDWARE_AVAILABLE:
         _status["state"] = "CONFIG_ERROR"
         _status["last_action"] = "hardware_preflight"
-        _status["last_error"] = _hardware_unavailable_error()
+        error = _hardware_unavailable_error()
+        _status["last_error"] = error
+        _record_server_alert(
+            severity="fault",
+            code="HARDWARE_UNAVAILABLE",
+            stage="startup_preflight",
+            summary="Actuation hardware is unavailable",
+            detail=error,
+            action="Restore the ROS hardware connection, then restart the dashboard.",
+        )
 
 
 @app.on_event("shutdown")
@@ -183,6 +195,10 @@ _status = {
     "last_error": "--",
 }
 
+_active_alert: dict | None = None
+_alert_history: deque[dict] = deque(maxlen=20)
+_alert_lock = threading.Lock()
+
 _scanner_proc: subprocess.Popen | None = None
 _scanner_monitor_thread: threading.Thread | None = None
 _scanner_autocycle_enabled = False
@@ -190,10 +206,92 @@ _scanner_lock = threading.Lock()
 _motion_operation_lock = threading.RLock()
 SCANNER_MODULE = "jetarm.sorting.yolo_vision_scanner"
 SCANNER_ACTUATION_ENV = "JETARM_ENABLE_ACTUATION"
+SCANNER_EVENT_TOKEN_ENV = "JETARM_SCANNER_EVENT_TOKEN"
 SCANNER_RESTART_DELAY_SEC = 0.5
 SCANNER_INTERRUPT_TIMEOUT_SEC = 3.0
 SCANNER_TERMINATE_TIMEOUT_SEC = 2.0
 SCANNER_KILL_TIMEOUT_SEC = 1.0
+ALERT_SEVERITIES = {"warning", "abort", "estop", "fault"}
+_scanner_event_token: str | None = None
+_scanner_abort_received = False
+
+
+def _alert_text(value, default: str, limit: int = 600) -> str:
+    text = str(value).strip() if value is not None else ""
+    return (text or default)[:limit]
+
+
+def _normalize_alert(event: dict) -> dict:
+    severity = _alert_text(event.get("severity"), "abort", 16).lower()
+    if severity not in ALERT_SEVERITIES:
+        severity = "abort"
+
+    return {
+        "id": _alert_text(event.get("id"), uuid.uuid4().hex, 64),
+        "severity": severity,
+        "source": _alert_text(event.get("source"), "system", 40),
+        "code": _alert_text(event.get("code"), "UNSPECIFIED", 80),
+        "stage": _alert_text(event.get("stage"), "unknown", 80),
+        "summary": _alert_text(event.get("summary"), "Operation interrupted", 180),
+        "detail": _alert_text(event.get("detail"), "No additional detail was provided"),
+        "action": _alert_text(
+            event.get("action"),
+            "Inspect the robot state before acknowledging this alert.",
+        ),
+        "object_state": _alert_text(event.get("object_state"), "unknown", 40),
+        "motion_state": _alert_text(event.get("motion_state"), "UNKNOWN", 40),
+        "requires_ack": bool(event.get("requires_ack", severity != "warning")),
+        "acknowledged": False,
+        "timestamp": _alert_text(event.get("timestamp"), datetime.now().isoformat(), 64),
+    }
+
+
+def _record_alert(event: dict) -> dict:
+    global _active_alert
+
+    normalized = _normalize_alert(event)
+    with _alert_lock:
+        _active_alert = normalized
+        _alert_history.append(normalized)
+
+    _status["last_error"] = f"{normalized['summary']}: {normalized['detail']}"
+    print(
+        "ALERT "
+        f"[{normalized['severity'].upper()}]"
+        f"[{normalized['source'].upper()}]"
+        f"[{normalized['stage'].upper()}]"
+        f"[{normalized['code']}] "
+        f"{normalized['detail']} | motion={normalized['motion_state']} "
+        f"| object={normalized['object_state']}"
+    )
+    return normalized
+
+
+def _record_server_alert(
+    *,
+    severity: str,
+    code: str,
+    stage: str,
+    summary: str,
+    detail: str,
+    action: str,
+    object_state: str = "not_applicable",
+) -> dict:
+    safety = motion_safety_status()
+    return _record_alert(
+        {
+            "severity": severity,
+            "source": "controller",
+            "code": code,
+            "stage": stage,
+            "summary": summary,
+            "detail": detail,
+            "action": action,
+            "object_state": object_state,
+            "motion_state": safety.get("state", "UNKNOWN"),
+            "requires_ack": severity != "warning",
+        }
+    )
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -225,24 +323,38 @@ def _scanner_is_running() -> bool:
 
 
 def _launch_scanner_process_unlocked() -> subprocess.Popen:
+    global _scanner_event_token, _scanner_abort_received
+
     env = os.environ.copy()
+    event_token = secrets.token_urlsafe(32)
 
     # IMPORTANT: force Vision_Scanner to use THIS server for frames (no camera conflict)
     env["UI_SERVER"] = "http://127.0.0.1:8000"
     env[SCANNER_ACTUATION_ENV] = "1" if SCANNER_ACTUATION_ENABLED else "0"
+    env[SCANNER_EVENT_TOKEN_ENV] = event_token
     env["PYTHONUNBUFFERED"] = "1"
 
-    return subprocess.Popen(
-        [sys.executable, "-m", SCANNER_MODULE],
-        cwd=str(Path(__file__).resolve().parents[3]),
-        env=env,
-        start_new_session=True,
-    )
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, "-m", SCANNER_MODULE],
+            cwd=str(Path(__file__).resolve().parents[3]),
+            env=env,
+            start_new_session=True,
+        )
+    except Exception:
+        _scanner_event_token = None
+        _scanner_abort_received = False
+        raise
+
+    _scanner_event_token = event_token
+    _scanner_abort_received = False
+    return proc
 
 
 def _stop_scanner_process() -> bool:
     """Stop the isolated scanner process, escalating through INT/TERM/KILL."""
     global _scanner_proc, _scanner_autocycle_enabled
+    global _scanner_event_token, _scanner_abort_received
 
     with _scanner_lock:
         _scanner_autocycle_enabled = False
@@ -252,6 +364,8 @@ def _stop_scanner_process() -> bool:
         with _scanner_lock:
             if _scanner_proc is proc:
                 _scanner_proc = None
+                _scanner_event_token = None
+                _scanner_abort_received = False
         return True
 
     try:
@@ -273,10 +387,12 @@ def _stop_scanner_process() -> bool:
         with _scanner_lock:
             if _scanner_proc is proc:
                 _scanner_proc = None
+                _scanner_event_token = None
+                _scanner_abort_received = False
 
 
 def _scanner_autocycle_loop() -> None:
-    global _scanner_proc, _scanner_autocycle_enabled
+    global _scanner_proc, _scanner_autocycle_enabled, _scanner_event_token
 
     while True:
         with _scanner_lock:
@@ -292,14 +408,32 @@ def _scanner_autocycle_loop() -> None:
                 return
             _scanner_proc = None
             autocycle_enabled = _scanner_autocycle_enabled
+            abort_received = _scanner_abort_received
+            _scanner_event_token = None
 
         if exit_code != 0:
             with _scanner_lock:
                 _scanner_autocycle_enabled = False
             stop_motion()
             _status["state"] = "SCANNER_ERROR"
-            _status["last_action"] = "scanner_exited"
-            _status["last_error"] = f"YOLO scanner exited with code {exit_code}"
+            if abort_received:
+                _status["last_action"] = "scanner_abort"
+                with _alert_lock:
+                    if _active_alert is not None:
+                        _active_alert["exit_code"] = exit_code
+                        _active_alert["motion_state"] = motion_safety_status().get(
+                            "state", "PAUSED"
+                        )
+            else:
+                _status["last_action"] = "scanner_exited"
+                _record_server_alert(
+                    severity="fault",
+                    code="SCANNER_EXIT_NONZERO",
+                    stage="scanner_process",
+                    summary="Scanner process exited unexpectedly",
+                    detail=f"YOLO scanner exited with code {exit_code}",
+                    action="Review the terminal output, acknowledge this alert, then Resume and retry.",
+                )
             return
 
         if not autocycle_enabled:
@@ -540,11 +674,73 @@ def api_status():
     payload["person_follow_running"] = _person_follow_is_running()
     payload["motion_safety"] = motion_safety_status()
 
+    with _alert_lock:
+        payload["active_alert"] = dict(_active_alert) if _active_alert is not None else None
+        payload["alert_history"] = [dict(alert) for alert in reversed(_alert_history)]
+
     # Expose joystick config/state for the UI
     payload["joy_speed"] = JOY_SPEED
     payload["joy_target"] = dict(joy_target)
 
     return JSONResponse(payload)
+
+
+@app.post("/api/scanner/event")
+def scanner_event(
+    event: dict = Body(...),
+    x_jetarm_scanner_token: str | None = Header(default=None),
+):
+    """Accept an authenticated structured event from the active scanner child."""
+    global _scanner_autocycle_enabled, _scanner_abort_received
+
+    with _scanner_lock:
+        expected_token = _scanner_event_token
+        authorized = (
+            isinstance(x_jetarm_scanner_token, str)
+            and isinstance(expected_token, str)
+            and secrets.compare_digest(x_jetarm_scanner_token, expected_token)
+        )
+
+    if not authorized:
+        return JSONResponse({"ok": False, "error": "Invalid scanner event token"}, status_code=403)
+
+    normalized = _normalize_alert(event)
+    if normalized["severity"] in {"abort", "estop", "fault"}:
+        with _scanner_lock:
+            _scanner_autocycle_enabled = False
+            _scanner_abort_received = True
+        stop_motion()
+        normalized["motion_state"] = motion_safety_status().get("state", "PAUSED")
+        _status["state"] = "SCANNER_ERROR"
+        _status["last_action"] = "scanner_abort"
+    else:
+        _status["last_action"] = "scanner_warning"
+
+    recorded = _record_alert(normalized)
+    return JSONResponse({"ok": True, "alert": recorded})
+
+
+@app.post("/api/alerts/acknowledge")
+def acknowledge_alert(payload: dict | None = Body(default=None)):
+    """Acknowledge the active UI alert without changing motion authority."""
+    global _active_alert
+
+    requested_id = (payload or {}).get("id")
+    with _alert_lock:
+        if _active_alert is None:
+            return JSONResponse({"ok": True, "acknowledged": False})
+        if requested_id and requested_id != _active_alert["id"]:
+            return JSONResponse(
+                {"ok": False, "error": "Alert is no longer active"},
+                status_code=409,
+            )
+
+        _active_alert["acknowledged"] = True
+        _active_alert["acknowledged_at"] = datetime.now().isoformat()
+        acknowledged_id = _active_alert["id"]
+        _active_alert = None
+
+    return JSONResponse({"ok": True, "acknowledged": True, "id": acknowledged_id})
 
 
 @app.post("/api/cmd")
@@ -565,6 +761,14 @@ def api_cmd(cmd: dict = Body(...)):
                 ok = ik.move_to(x, y, z)
             if not ok:
                 _status["last_error"] = "IK failed / joint limit"
+                _record_server_alert(
+                    severity="warning",
+                    code="MANUAL_TARGET_REJECTED",
+                    stage="manual_goto",
+                    summary="Manual target rejected before motion",
+                    detail=f"Requested target x={x:.2f}, y={y:.2f}, z={z:.2f} failed IK or a joint limit.",
+                    action="Choose a target inside the calibrated workspace and retry.",
+                )
                 return JSONResponse({"ok": False, "error": _status["last_error"]}, status_code=400)
             return JSONResponse({"ok": True})
 
@@ -632,6 +836,14 @@ def api_cmd(cmd: dict = Body(...)):
             _request_scanner_autocycle_stop()
             _stop_scanner_process()
             _status["state"] = "ESTOP"
+            _record_server_alert(
+                severity="estop",
+                code="ESTOP_LATCHED",
+                stage="operator_command",
+                summary="Emergency stop latched",
+                detail="Software E-stop was activated and motion commands are blocked.",
+                action="Inspect the robot, Clear E-Stop, acknowledge this alert, then press Resume separately.",
+            )
             return JSONResponse({"ok": True})
 
         if ctype == "pause":
@@ -668,6 +880,14 @@ def api_cmd(cmd: dict = Body(...)):
 
     except Exception as e:
         _status["last_error"] = str(e)
+        _record_server_alert(
+            severity="abort",
+            code="COMMAND_EXCEPTION",
+            stage=ctype or "unknown_command",
+            summary="Controller command aborted",
+            detail=str(e),
+            action="Inspect the requested command and robot state before acknowledging and retrying.",
+        )
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 

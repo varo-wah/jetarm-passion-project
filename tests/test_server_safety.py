@@ -44,6 +44,10 @@ class ServerSafetyTests(unittest.TestCase):
         hardware.resume_system()
         server_app._scanner_proc = None
         server_app._scanner_autocycle_enabled = False
+        server_app._scanner_event_token = None
+        server_app._scanner_abort_received = False
+        server_app._active_alert = None
+        server_app._alert_history.clear()
         server_app._person_follow_stop.set()
         server_app._status["state"] = "IDLE"
         server_app._status["last_action"] = "--"
@@ -52,6 +56,10 @@ class ServerSafetyTests(unittest.TestCase):
     def tearDown(self):
         server_app._scanner_proc = None
         server_app._scanner_autocycle_enabled = False
+        server_app._scanner_event_token = None
+        server_app._scanner_abort_received = False
+        server_app._active_alert = None
+        server_app._alert_history.clear()
         hardware.clear_estop()
         hardware.resume_system()
 
@@ -143,6 +151,11 @@ class ServerSafetyTests(unittest.TestCase):
         args, kwargs = popen.call_args
         self.assertEqual(args[0][-1], "jetarm.sorting.yolo_vision_scanner")
         self.assertEqual(kwargs["env"]["JETARM_ENABLE_ACTUATION"], "0")
+        self.assertTrue(kwargs["env"]["JETARM_SCANNER_EVENT_TOKEN"])
+        self.assertEqual(
+            kwargs["env"]["JETARM_SCANNER_EVENT_TOKEN"],
+            server_app._scanner_event_token,
+        )
         self.assertEqual(kwargs["env"]["PYTHONUNBUFFERED"], "1")
         self.assertTrue(kwargs["start_new_session"])
 
@@ -157,9 +170,99 @@ class ServerSafetyTests(unittest.TestCase):
 
         self.assertEqual(server_app._status["state"], "SCANNER_ERROR")
         self.assertEqual(server_app._status["last_action"], "scanner_exited")
-        self.assertEqual(server_app._status["last_error"], "YOLO scanner exited with code 7")
+        self.assertIn("YOLO scanner exited with code 7", server_app._status["last_error"])
+        self.assertEqual(server_app._active_alert["code"], "SCANNER_EXIT_NONZERO")
+        self.assertEqual(server_app._active_alert["severity"], "fault")
         self.assertIsNone(server_app._scanner_proc)
         stop_motion.assert_called_once_with()
+
+    def test_authenticated_scanner_abort_preserves_exact_reason_and_pauses(self):
+        server_app._scanner_event_token = "scanner-secret"
+        event = {
+            "severity": "abort",
+            "source": "scanner",
+            "code": "JOINT_LIMIT",
+            "stage": "target_pickup",
+            "summary": "Target pickup motion rejected",
+            "detail": "elbow_joint pulse 112 is below minimum 120",
+            "action": "Move the object farther from the base and retry.",
+            "object_state": "not_gripped",
+        }
+
+        with patch.object(server_app, "stop_motion") as stop_motion, patch.object(
+            server_app,
+            "motion_safety_status",
+            return_value={"state": "PAUSED"},
+        ):
+            response = server_app.scanner_event(
+                event,
+                x_jetarm_scanner_token="scanner-secret",
+            )
+
+        payload = response_payload(response)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["alert"]["detail"], event["detail"])
+        self.assertEqual(payload["alert"]["stage"], "target_pickup")
+        self.assertEqual(payload["alert"]["motion_state"], "PAUSED")
+        self.assertEqual(server_app._status["last_action"], "scanner_abort")
+        self.assertTrue(server_app._scanner_abort_received)
+        self.assertFalse(server_app._scanner_autocycle_enabled)
+        stop_motion.assert_called_once_with()
+
+    def test_scanner_event_rejects_invalid_token(self):
+        server_app._scanner_event_token = "scanner-secret"
+
+        response = server_app.scanner_event(
+            {"severity": "abort"},
+            x_jetarm_scanner_token="wrong-token",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIsNone(server_app._active_alert)
+
+    def test_scanner_preflight_warning_does_not_pause_or_disable_autocycle(self):
+        server_app._scanner_event_token = "scanner-secret"
+        server_app._scanner_autocycle_enabled = True
+
+        with patch.object(server_app, "stop_motion") as stop_motion:
+            response = server_app.scanner_event(
+                {
+                    "severity": "warning",
+                    "code": "NO_SAFE_ROUTE",
+                    "stage": "target_pickup",
+                    "summary": "Detection skipped before motion",
+                    "detail": "elbow joint would exceed its calibrated range",
+                    "action": "Move the object farther from the base.",
+                    "requires_ack": False,
+                },
+                x_jetarm_scanner_token="scanner-secret",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(server_app._active_alert["severity"], "warning")
+        self.assertFalse(server_app._active_alert["requires_ack"])
+        self.assertTrue(server_app._scanner_autocycle_enabled)
+        self.assertFalse(server_app._scanner_abort_received)
+        stop_motion.assert_not_called()
+
+    def test_acknowledging_alert_does_not_resume_motion(self):
+        alert = server_app._record_server_alert(
+            severity="abort",
+            code="TEST_ABORT",
+            stage="test",
+            summary="Test abort",
+            detail="Test detail",
+            action="Inspect the test.",
+        )
+
+        with patch.object(server_app, "resume_system") as resume:
+            response = server_app.acknowledge_alert({"id": alert["id"]})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response_payload(response)["acknowledged"])
+        self.assertIsNone(server_app._active_alert)
+        self.assertTrue(server_app._alert_history[-1]["acknowledged"])
+        resume.assert_not_called()
 
     def test_shutdown_stops_camera_after_workers(self):
         with patch.object(server_app, "_request_person_follow_stop") as stop_follow, patch.object(
