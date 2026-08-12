@@ -32,22 +32,6 @@ The vendor service remains stopped after this launcher exits because restarting
 it can command an initial pose. Reboot to restore the normal vendor application,
 or restart it manually only after the servo power and workspace are safe.
 
-The dashboard camera worker applies a repeatable low-light profile when it opens
-`/dev/video0`: brightness `12`, gain `20`, gamma `140`, and backlight
-compensation `2`. Override individual values before launching when lighting
-conditions change:
-
-```bash
-JETARM_CAMERA_BRIGHTNESS=7 \
-JETARM_CAMERA_GAIN=11 \
-JETARM_CAMERA_GAMMA=120 \
-JETARM_CAMERA_BACKLIGHT=1 \
-./scripts/run_jetarm.sh --actuate
-```
-
-These settings belong to the dashboard's OpenCV camera owner. Editing the
-vendor `usb_cam_param.yaml` does not configure this capture path.
-
 Motion requests retain their requested duration when it is already safe. If a
 request would exceed a calibrated joint velocity, the central controller
 automatically extends only that trajectory to the shortest permitted duration.
@@ -61,6 +45,11 @@ auto-cycle and pause motion; amber preflight warnings do not pause the robot.
 The Acknowledge button dismisses only the message—it does not clear an E-stop or
 resume motion. The five most recent events remain available under **Recent
 alert history**.
+
+Before opening `/dev/video0`, the dashboard restores supported brightness,
+contrast, saturation, exposure, gain, gamma, focus, and white-balance controls
+to the V4L2 driver's declared defaults. Raw, OpenCV, and YOLO views use the
+camera frame directly; no display enhancement is applied.
 
 The dashboard's stop, pause, E-stop, scanner, person-follow, and manual-motion
 paths are software controls. They do not replace the robot's physical power
