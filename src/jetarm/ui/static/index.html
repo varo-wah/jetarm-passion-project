@@ -256,7 +256,7 @@
       }
       .btn:hover{filter:brightness(1.08)}
       .btn:active{transform:translateY(1px)}
-      .btn:disabled{opacity:.62; cursor:wait; filter:none}
+      .btn:disabled{opacity:.38; cursor:not-allowed; filter:grayscale(.45); transform:none}
       .btn-primary{border-color:rgba(68,183,255,.65); background:#17334a}
       .btn-good{border-color:rgba(41,212,123,.65); background:#143225}
       .btn-warn{border-color:rgba(242,201,76,.65); background:#312a13}
@@ -321,6 +321,55 @@
       .danger-zone{
         border-color:rgba(255,77,94,.5);
         background:#1d0d12;
+      }
+      .motion-state-banner{
+        display:flex;
+        align-items:flex-start;
+        gap:10px;
+        border:1px solid var(--line);
+        border-left:5px solid var(--muted);
+        border-radius:8px;
+        background:#101722;
+        padding:10px 11px;
+        margin-bottom:10px;
+      }
+      .motion-state-banner .motion-state-dot{
+        width:10px;
+        height:10px;
+        margin-top:4px;
+        border-radius:50%;
+        background:var(--muted);
+        box-shadow:0 0 10px rgba(149,167,188,.45);
+        flex:0 0 auto;
+      }
+      .motion-state-banner strong{display:block; font-size:14px}
+      .motion-state-banner span{display:block; color:var(--muted); font-size:12px; margin-top:2px}
+      .motion-state-banner.ready{
+        border-color:rgba(41,212,123,.58);
+        border-left-color:var(--green);
+        background:#10251b;
+      }
+      .motion-state-banner.ready .motion-state-dot{
+        background:var(--green);
+        box-shadow:0 0 12px rgba(41,212,123,.7);
+      }
+      .motion-state-banner.paused{
+        border-color:rgba(242,201,76,.65);
+        border-left-color:var(--yellow);
+        background:#29230f;
+      }
+      .motion-state-banner.paused .motion-state-dot{
+        background:var(--yellow);
+        box-shadow:0 0 12px rgba(242,201,76,.7);
+      }
+      .motion-state-banner.estop{
+        border-color:rgba(255,77,94,.82);
+        border-left-color:var(--red);
+        background:#351016;
+      }
+      .motion-state-banner.estop .motion-state-dot{
+        background:var(--red);
+        box-shadow:0 0 14px rgba(255,77,94,.85);
       }
       .hint{
         color:var(--muted);
@@ -506,10 +555,10 @@
                 </div>
               </div>
               <div class="row" style="margin-top:10px">
-                <button class="btn btn-primary" id="btnGoto">Go To X/Y/Z</button>
-                <button class="btn" id="btnHome">Scan Pose</button>
-                <button class="btn" id="btnGripOpen">Open Gripper</button>
-                <button class="btn" id="btnGripClose">Close Gripper</button>
+                <button class="btn btn-primary" id="btnGoto" disabled>Go To X/Y/Z</button>
+                <button class="btn" id="btnHome" disabled>Scan Pose</button>
+                <button class="btn" id="btnGripOpen" disabled>Open Gripper</button>
+                <button class="btn" id="btnGripClose" disabled>Close Gripper</button>
               </div>
             </div>
 
@@ -517,18 +566,18 @@
               <div class="title">Jog Controls</div>
               <div class="jog-grid">
                 <div class="stack">
-                  <button class="btn btn-primary" id="btnZUp">Z Up</button>
-                  <button class="btn btn-primary" id="btnZDown">Z Down</button>
+                  <button class="btn btn-primary" id="btnZUp" disabled>Z Up</button>
+                  <button class="btn btn-primary" id="btnZDown" disabled>Z Down</button>
                 </div>
                 <div class="dpad">
                   <div></div>
-                  <button class="btn btn-primary" id="btnFwd">Y+</button>
+                  <button class="btn btn-primary" id="btnFwd" disabled>Y+</button>
                   <div></div>
-                  <button class="btn btn-primary" id="btnLeft">X-</button>
-                  <button class="btn btn-danger" id="btnCenter">Reset</button>
-                  <button class="btn btn-primary" id="btnRight">X+</button>
+                  <button class="btn btn-primary" id="btnLeft" disabled>X-</button>
+                  <button class="btn btn-danger" id="btnCenter" disabled>Reset</button>
+                  <button class="btn btn-primary" id="btnRight" disabled>X+</button>
                   <div></div>
-                  <button class="btn btn-primary" id="btnBack">Y-</button>
+                  <button class="btn btn-primary" id="btnBack" disabled>Y-</button>
                   <div></div>
                 </div>
                 <div class="field">
@@ -564,24 +613,31 @@
             <div class="panel">
               <div class="title">Scanner</div>
               <div class="row">
-                <button class="btn btn-good" id="btnScannerStart">Start Scanner Cycle</button>
-                <button class="btn btn-danger" id="btnScannerStop">Stop Scanner</button>
+                <button class="btn btn-good" id="btnScannerStart" disabled>Start Scanner Cycle</button>
+                <button class="btn btn-danger" id="btnScannerStop" disabled>Stop Scanner</button>
               </div>
               <div class="hint">Preview mode performs one YOLO scan without robot motion. Actuation mode sorts, presses the button, and restarts until stopped.</div>
             </div>
 
             <div class="panel">
               <div class="title">Motion State</div>
+              <div id="motionStateBanner" class="motion-state-banner unknown" role="status" aria-live="polite">
+                <span class="motion-state-dot" aria-hidden="true"></span>
+                <div>
+                  <strong id="motionStateLabel">Checking controller state</strong>
+                  <span id="motionStateHelp">Motion controls remain disabled until status is confirmed.</span>
+                </div>
+              </div>
               <div class="row">
-                <button class="btn btn-warn" id="btnPause">Pause</button>
-                <button class="btn btn-primary" id="btnResume">Resume</button>
+                <button class="btn btn-warn" id="btnPause" disabled>Pause</button>
+                <button class="btn btn-primary" id="btnResume" disabled>Resume</button>
               </div>
               <div class="row" style="margin-top:8px">
-                <button class="btn btn-danger" id="btnStop">Stop</button>
-                <button class="btn btn-danger" id="btnEstop">E-Stop</button>
+                <button class="btn btn-danger" id="btnStop" disabled>Stop</button>
+                <button class="btn btn-danger" id="btnEstop" disabled>E-Stop</button>
               </div>
               <div class="row" style="margin-top:8px">
-                <button class="btn btn-warn" id="btnClearEstop">Clear E-Stop Latch</button>
+                <button class="btn btn-warn" id="btnClearEstop" disabled>Clear E-Stop Latch</button>
               </div>
               <div class="hint">Clearing the E-stop leaves motion paused. Resume is a separate action.</div>
             </div>
@@ -589,19 +645,19 @@
             <div class="panel">
               <div class="title">User-Friendly Mode</div>
               <div class="row">
-                <button class="btn btn-good" id="btnPersonFollowStart">Start Person Follow</button>
-                <button class="btn btn-danger" id="btnPersonFollowStop">Stop Follow</button>
+                <button class="btn btn-good" id="btnPersonFollowStart" disabled>Start Person Follow</button>
+                <button class="btn btn-danger" id="btnPersonFollowStop" disabled>Stop Follow</button>
               </div>
               <div class="row" style="margin-top:8px">
-                <button class="btn btn-primary" id="btnIdlePose">Idle Pose</button>
-                <button class="btn btn-primary" id="btnLookAround">Look Around</button>
+                <button class="btn btn-primary" id="btnIdlePose" disabled>Idle Pose</button>
+                <button class="btn btn-primary" id="btnLookAround" disabled>Look Around</button>
               </div>
               <div class="row" style="margin-top:8px">
-                <button class="btn btn-primary" id="btnHelloWave">Hello Wave</button>
-                <button class="btn btn-primary" id="btnCuriousIdle">Curious Idle</button>
+                <button class="btn btn-primary" id="btnHelloWave" disabled>Hello Wave</button>
+                <button class="btn btn-primary" id="btnCuriousIdle" disabled>Curious Idle</button>
               </div>
               <div class="row" style="margin-top:8px">
-                <button class="btn btn-warn" id="btnPressButton">Press Button</button>
+                <button class="btn btn-warn" id="btnPressButton" disabled>Press Button</button>
               </div>
               <div class="hint">Person follow uses the camera and only shifts the arm left/right at scan height. The backend blocks it while the scanner is running.</div>
             </div>
@@ -647,6 +703,86 @@
       const $ = (id) => document.getElementById(id);
       let joySpeed = 0.3;
       let currentAlert = null;
+      let lastDashboardStatus = null;
+      const pendingControlIds = new Set();
+      const motionActionButtonIds = [
+        "btnGoto", "btnHome", "btnGripOpen", "btnGripClose",
+        "btnZUp", "btnZDown", "btnFwd", "btnLeft", "btnCenter", "btnRight", "btnBack",
+        "btnScannerStart", "btnPersonFollowStart", "btnIdlePose", "btnLookAround",
+        "btnHelloWave", "btnCuriousIdle", "btnPressButton",
+      ];
+
+      function setButtonAvailability(id, enabled, disabledReason){
+        const button = $(id);
+        const disabled = !enabled || pendingControlIds.has(id);
+        button.disabled = disabled;
+        button.setAttribute("aria-disabled", String(disabled));
+        button.title = disabled && !pendingControlIds.has(id) ? disabledReason : "";
+      }
+
+      function applyMotionControls(status){
+        lastDashboardStatus = status || null;
+        const safety = status?.motion_safety;
+        const online = !!safety && typeof safety === "object";
+        const estopLatched = online && safety.estop_latched === true;
+        const paused = online && safety.paused === true;
+        const motionAllowed = online && safety.motion_allowed === true && !paused && !estopLatched;
+        const scannerRunning = online && status.scanner_running === true;
+        const personFollowRunning = online && status.person_follow_running === true;
+        const controllerState = String(safety?.state || "").replaceAll("_", " ").trim();
+
+        let stateClass = "unknown";
+        let stateLabel = "CONTROLLER STATUS UNAVAILABLE";
+        let stateHelp = "Motion controls remain disabled until status is confirmed.";
+        let blockedReason = stateHelp;
+
+        if (estopLatched){
+          stateClass = "estop";
+          stateLabel = "E-STOP LATCHED — MOTION BLOCKED";
+          stateHelp = "Inspect the robot, then use Clear E-Stop Latch. Resume remains a separate action.";
+          blockedReason = "Disabled because the E-stop latch is active.";
+        } else if (paused || (online && !motionAllowed)){
+          stateClass = "paused";
+          stateLabel = `${controllerState || "PAUSED"} — MOTION BLOCKED`;
+          stateHelp = "Press Resume when the workspace is clear and supervised motion is intended.";
+          blockedReason = "Disabled because motion is paused or locked.";
+        } else if (motionAllowed){
+          stateClass = "ready";
+          stateLabel = `${controllerState || "READY"} — MOTION ENABLED`;
+          stateHelp = "Motion commands are available. Keep the physical stop path ready.";
+          blockedReason = "";
+        }
+
+        const banner = $("motionStateBanner");
+        banner.className = `motion-state-banner ${stateClass}`;
+        $("motionStateLabel").textContent = stateLabel;
+        $("motionStateHelp").textContent = stateHelp;
+        $("stateText").textContent = stateLabel.split(" — ")[0];
+
+        for (const id of motionActionButtonIds){
+          setButtonAvailability(id, motionAllowed, blockedReason);
+        }
+
+        setButtonAvailability("btnPause", motionAllowed, blockedReason || "Motion is already blocked.");
+        setButtonAvailability(
+          "btnResume",
+          online && paused && !estopLatched,
+          estopLatched ? "Clear the E-stop latch before resuming." : "Resume is available only while paused.",
+        );
+        setButtonAvailability("btnStop", motionAllowed, blockedReason || "Motion is already blocked.");
+        setButtonAvailability(
+          "btnEstop",
+          online && !estopLatched,
+          estopLatched ? "The E-stop latch is already active." : "Controller status is unavailable.",
+        );
+        setButtonAvailability(
+          "btnClearEstop",
+          estopLatched,
+          online ? "No E-stop latch is active." : "Controller status is unavailable.",
+        );
+        setButtonAvailability("btnScannerStop", scannerRunning, "The scanner is not running.");
+        setButtonAvailability("btnPersonFollowStop", personFollowRunning, "Person follow is not running.");
+      }
 
       async function responseError(res){
         const text = await res.text();
@@ -706,7 +842,8 @@
 
       async function fireImmediateCmd(button, type, sentText){
         const originalText = button.textContent;
-        button.disabled = true;
+        pendingControlIds.add(button.id);
+        applyMotionControls(lastDashboardStatus);
         button.textContent = sentText;
 
         try {
@@ -714,10 +851,9 @@
         } catch(e) {
           alert(`${originalText} failed: ${e.message}`);
         } finally {
-          setTimeout(() => {
-            button.disabled = false;
-            button.textContent = originalText;
-          }, 1200);
+          pendingControlIds.delete(button.id);
+          button.textContent = originalText;
+          await refreshStatus();
         }
       }
 
@@ -761,8 +897,16 @@
         return await res.json();
       }
 
-      $("btnPause").onclick = async () => { try { await postCmd("pause", {}); } catch(e){ alert(`Pause failed: ${e.message}`); } };
-      $("btnResume").onclick = async () => { try { await postCmd("resume", {}); } catch(e){ alert(`Resume failed: ${e.message}`); } };
+      $("btnPause").onclick = async () => {
+        try { await postCmd("pause", {}); }
+        catch(e){ alert(`Pause failed: ${e.message}`); }
+        finally { await refreshStatus(); }
+      };
+      $("btnResume").onclick = async () => {
+        try { await postCmd("resume", {}); }
+        catch(e){ alert(`Resume failed: ${e.message}`); }
+        finally { await refreshStatus(); }
+      };
       $("btnStop").onclick = async () => {
         await fireImmediateCmd($("btnStop"), "stop", "Stop Sent");
       };
@@ -925,7 +1069,7 @@
           const s = await res.json();
 
           setConn(true);
-          $("stateText").textContent = s.state ?? "UNKNOWN";
+          applyMotionControls(s);
           $("lastActionText").textContent = s.last_action ?? "--";
           $("lastDetText").textContent = s.last_detection ?? "--";
           $("countText").textContent = s.sort_count ?? "--";
@@ -953,9 +1097,11 @@
           }
         }catch(e){
           setConn(false);
+          applyMotionControls(null);
         }
       }
 
+      applyMotionControls(null);
       refreshStatus();
       setInterval(refreshStatus, 500);
     </script>
