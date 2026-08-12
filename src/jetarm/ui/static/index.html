@@ -107,14 +107,25 @@
         margin:0 auto;
         padding:16px;
       }
-      .layout{
+      .dashboard-grid{
         display:grid;
         grid-template-columns:minmax(0,1.55fr) minmax(360px,.8fr);
         gap:16px;
         align-items:start;
       }
+      .column-stack{
+        display:flex;
+        flex-direction:column;
+        gap:16px;
+        min-width:0;
+      }
       @media (max-width:980px){
-        .layout{grid-template-columns:1fr}
+        .dashboard-grid{grid-template-columns:1fr}
+        .column-stack{display:contents}
+        .dashboard-grid > .column-stack:first-child > .card:first-child{order:1}
+        .dashboard-grid > .column-stack:nth-child(2) > .card:first-child{order:2}
+        .dashboard-grid > .column-stack:first-child > .card:nth-child(2){order:3}
+        .dashboard-grid > .column-stack:nth-child(2) > .card:nth-child(2){order:4}
         .topbar-inner{align-items:flex-start; flex-direction:column}
         .top-status{justify-content:flex-start}
       }
@@ -443,7 +454,8 @@
         <summary>Recent alert history</summary>
         <div id="alertHistoryList"></div>
       </details>
-      <div class="layout">
+      <div class="dashboard-grid">
+        <div class="column-stack">
         <section class="card">
           <div class="card-head">
             <div>
@@ -471,6 +483,66 @@
           </div>
         </section>
 
+        <section class="card">
+          <div class="card-head">
+            <div class="title">Manual Positioning</div>
+            <div class="mono">cm</div>
+          </div>
+          <div class="stack" style="padding:12px">
+            <div class="panel">
+              <div class="title">Go To</div>
+              <div class="inputs">
+                <div class="field">
+                  <label for="xIn">X</label>
+                  <input id="xIn" inputmode="decimal" placeholder="10.5" />
+                </div>
+                <div class="field">
+                  <label for="yIn">Y</label>
+                  <input id="yIn" inputmode="decimal" placeholder="22.0" />
+                </div>
+                <div class="field">
+                  <label for="zIn">Z</label>
+                  <input id="zIn" inputmode="decimal" placeholder="8.0" />
+                </div>
+              </div>
+              <div class="row" style="margin-top:10px">
+                <button class="btn btn-primary" id="btnGoto">Go To X/Y/Z</button>
+                <button class="btn" id="btnHome">Scan Pose</button>
+                <button class="btn" id="btnGripOpen">Open Gripper</button>
+                <button class="btn" id="btnGripClose">Close Gripper</button>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="title">Jog Controls</div>
+              <div class="jog-grid">
+                <div class="stack">
+                  <button class="btn btn-primary" id="btnZUp">Z Up</button>
+                  <button class="btn btn-primary" id="btnZDown">Z Down</button>
+                </div>
+                <div class="dpad">
+                  <div></div>
+                  <button class="btn btn-primary" id="btnFwd">Y+</button>
+                  <div></div>
+                  <button class="btn btn-primary" id="btnLeft">X-</button>
+                  <button class="btn btn-danger" id="btnCenter">Reset</button>
+                  <button class="btn btn-primary" id="btnRight">X+</button>
+                  <div></div>
+                  <button class="btn btn-primary" id="btnBack">Y-</button>
+                  <div></div>
+                </div>
+                <div class="field">
+                  <label for="stepIn">Step size</label>
+                  <input id="stepIn" inputmode="decimal" value="0.5" />
+                  <div class="hint">Jog commands use the server speed setting.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        </div>
+
+        <div class="column-stack">
         <aside class="card">
           <div class="card-head">
             <div class="title">Operator Controls</div>
@@ -535,66 +607,6 @@
             </div>
           </div>
         </aside>
-      </div>
-
-      <div class="layout" style="margin-top:16px">
-        <section class="card">
-          <div class="card-head">
-            <div class="title">Manual Positioning</div>
-            <div class="mono">cm</div>
-          </div>
-          <div class="stack" style="padding:12px">
-            <div class="panel">
-              <div class="title">Go To</div>
-              <div class="inputs">
-                <div class="field">
-                  <label for="xIn">X</label>
-                  <input id="xIn" inputmode="decimal" placeholder="10.5" />
-                </div>
-                <div class="field">
-                  <label for="yIn">Y</label>
-                  <input id="yIn" inputmode="decimal" placeholder="22.0" />
-                </div>
-                <div class="field">
-                  <label for="zIn">Z</label>
-                  <input id="zIn" inputmode="decimal" placeholder="8.0" />
-                </div>
-              </div>
-              <div class="row" style="margin-top:10px">
-                <button class="btn btn-primary" id="btnGoto">Go To X/Y/Z</button>
-                <button class="btn" id="btnHome">Scan Pose</button>
-                <button class="btn" id="btnGripOpen">Open Gripper</button>
-                <button class="btn" id="btnGripClose">Close Gripper</button>
-              </div>
-            </div>
-
-            <div class="panel">
-              <div class="title">Jog Controls</div>
-              <div class="jog-grid">
-                <div class="stack">
-                  <button class="btn btn-primary" id="btnZUp">Z Up</button>
-                  <button class="btn btn-primary" id="btnZDown">Z Down</button>
-                </div>
-                <div class="dpad">
-                  <div></div>
-                  <button class="btn btn-primary" id="btnFwd">Y+</button>
-                  <div></div>
-                  <button class="btn btn-primary" id="btnLeft">X-</button>
-                  <button class="btn btn-danger" id="btnCenter">Reset</button>
-                  <button class="btn btn-primary" id="btnRight">X+</button>
-                  <div></div>
-                  <button class="btn btn-primary" id="btnBack">Y-</button>
-                  <div></div>
-                </div>
-                <div class="field">
-                  <label for="stepIn">Step size</label>
-                  <input id="stepIn" inputmode="decimal" value="0.5" />
-                  <div class="hint">Jog commands use the server speed setting.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <aside class="card">
           <div class="card-head">
@@ -626,7 +638,9 @@
             </div>
           </div>
         </aside>
+        </div>
       </div>
+
     </main>
 
     <script>

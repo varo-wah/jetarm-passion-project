@@ -7,6 +7,13 @@ DASHBOARD = (PROJECT_ROOT / "src" / "jetarm" / "ui" / "static" / "index.html").r
 
 
 class DashboardAlertContractTests(unittest.TestCase):
+    def test_dashboard_columns_stack_independently(self):
+        self.assertIn('class="dashboard-grid"', DASHBOARD)
+        self.assertEqual(DASHBOARD.count('class="column-stack"'), 2)
+        self.assertLess(DASHBOARD.index("Vision Feed"), DASHBOARD.index("Manual Positioning"))
+        self.assertLess(DASHBOARD.index("Operator Controls"), DASHBOARD.index("Active Programs"))
+        self.assertNotIn('class="layout"', DASHBOARD)
+
     def test_dashboard_has_persistent_structured_alert_fields(self):
         for element_id in (
             "alertBanner",
