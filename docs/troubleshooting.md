@@ -6,4 +6,8 @@
   the paths containing `rclpy` and JetArm message packages.
 - If the actuation launcher reports missing ROS imports, open a JetArm ROS 2
   shell and rerun it. Do not install `rclpy` with pip.
+- On every camera start, the dashboard restores supported image controls to the
+  V4L2 driver's defaults before OpenCV opens `/dev/video0`. If the startup log
+  says `v4l2-ctl` is unavailable or the feed remains tinted, capture
+  `v4l2-ctl -d /dev/video0 --all` instead of adding display filters.
 - If pixel-to-robot conversion fails, verify the calibration files exist in `data/calibration/`.
