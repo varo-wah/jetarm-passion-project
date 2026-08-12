@@ -10,10 +10,10 @@
   the listed node/process; centralized authority requires exactly one publisher.
 - If startup reports `/dev/video0` is busy, stop the listed camera owner before
   retrying. The dashboard camera worker must be the device's only owner.
-- If the dashboard feed is dark, tune the `JETARM_CAMERA_BRIGHTNESS`,
-  `JETARM_CAMERA_GAIN`, `JETARM_CAMERA_GAMMA`, and
-  `JETARM_CAMERA_BACKLIGHT` environment variables. The ROS
-  `usb_cam_param.yaml` is not used by the dashboard's OpenCV capture path.
+- On every camera start, the dashboard restores supported image controls to the
+  V4L2 driver's defaults before OpenCV opens `/dev/video0`. If the startup log
+  says `v4l2-ctl` is unavailable or the feed remains tinted, capture
+  `v4l2-ctl -d /dev/video0 --all` instead of adding display filters.
 - If scanner preflight rejects a target, do not expand joint limits. Reposition
   the object or calibrate the bucket/arm geometry; no object has been gripped at
   the time of a preflight rejection.
